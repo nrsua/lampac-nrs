@@ -1,0 +1,12 @@
+{
+  "enable": true,
+  "dynamic": true,
+  "tree": [
+    "Models",
+    "Services",
+    "ModInit.cs",
+    "ModuleConf.cs",
+    "SqlContext.cs",
+    "ApiController.cs"
+  ]
+}
