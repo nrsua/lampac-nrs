@@ -293,6 +293,10 @@ public sealed class TelegramBotService : BackgroundService
         var voice = string.IsNullOrEmpty(s.voice) ? voiceAny : s.voice;
         var seasonNum = s.target_season > 0 ? s.target_season : s.last_season;
 
+        bool hasVoice = !string.IsNullOrEmpty(s.voice);
+        int shownAired = hasVoice ? s.last_voice_episode : s.season_aired;
+        int shownTotal = s.season_total;
+
         var sb = new StringBuilder();
         sb.Append("<blockquote>");
         sb.Append("🎬 <b>").Append(Notifier.Esc(s.title)).Append("</b>");
@@ -301,10 +305,14 @@ public sealed class TelegramBotService : BackgroundService
 
         sb.Append("📺 <b>S").Append(seasonNum.ToString("D2")).Append("</b>");
 
-        if (s.season_total > 0)
+        if (shownTotal > 0)
         {
-            sb.Append(" · ").Append(s.season_aired).Append('/').Append(s.season_total);
-            sb.Append("  <code>").Append(Notifier.ProgressBar(s.season_aired, s.season_total)).Append("</code>");
+            sb.Append(" · ").Append(shownAired.ToString("D2")).Append('/').Append(shownTotal.ToString("D2"));
+            sb.Append("  <code>").Append(Notifier.ProgressBar(shownAired, shownTotal)).Append("</code>");
+
+            if (hasVoice && s.season_aired > shownAired)
+                sb.Append("\n      <i>(").Append(Strings.T(L, "tmdb_aired_note")).Append(": ")
+                  .Append(s.season_aired).Append('/').Append(s.season_total).Append(")</i>");
         }
         else
         {
@@ -312,24 +320,28 @@ public sealed class TelegramBotService : BackgroundService
         }
         sb.Append('\n');
 
-        sb.Append(StatusEmoji(s)).Append(' ');
         bool ended = string.Equals(s.show_status, "Ended", StringComparison.OrdinalIgnoreCase)
                   || string.Equals(s.show_status, "Canceled", StringComparison.OrdinalIgnoreCase);
-        bool allOut = s.season_total > 0 && s.season_aired >= s.season_total;
+        bool allShownOut = shownTotal > 0 && shownAired >= shownTotal;
+        bool tmdbAllOut = s.season_total > 0 && s.season_aired >= s.season_total;
 
-        if (allOut && ended)
+        sb.Append(StatusEmoji(hasVoice, shownTotal, allShownOut, tmdbAllOut, ended, s)).Append(' ');
+
+        if (allShownOut && ended)
             sb.Append("<i>").Append(Notifier.Esc(Strings.T(L, "all_aired"))).Append("</i>");
-        else if (allOut)
+        else if (allShownOut)
         {
             sb.Append("<i>").Append(Notifier.Esc(Strings.T(L, "season_complete_waiting"))).Append("</i>");
             if (s.next_air_date.HasValue && s.next_air_date.Value.Date >= DateTime.UtcNow.Date)
                 sb.Append(" · ").Append(Strings.T(L, "next_air")).Append(' ')
                   .Append(s.next_air_date.Value.ToString("yyyy-MM-dd"));
         }
-        else if (s.season_total > 0)
+        else if (shownTotal > 0)
         {
-            sb.Append("<i>").Append(Notifier.Esc(Strings.ShowStatusLabel(L, s.show_status))).Append("</i>");
-            if (s.next_air_date.HasValue && s.next_air_date.Value.Date >= DateTime.UtcNow.Date)
+            var key = hasVoice ? "voice_waiting" : null;
+            var label = key != null ? Strings.T(L, key) : Strings.ShowStatusLabel(L, s.show_status);
+            sb.Append("<i>").Append(Notifier.Esc(label)).Append("</i>");
+            if (!hasVoice && s.next_air_date.HasValue && s.next_air_date.Value.Date >= DateTime.UtcNow.Date)
                 sb.Append(" · ").Append(Strings.T(L, "next_air")).Append(' ')
                   .Append(s.next_air_date.Value.ToString("yyyy-MM-dd"));
         }
@@ -344,16 +356,12 @@ public sealed class TelegramBotService : BackgroundService
         return sb.ToString();
     }
 
-    static string StatusEmoji(SubscriptionRow s)
+    static string StatusEmoji(bool hasVoice, int shownTotal, bool allShownOut, bool tmdbAllOut, bool ended, SubscriptionRow s)
     {
-        bool ended = string.Equals(s.show_status, "Ended", StringComparison.OrdinalIgnoreCase)
-                  || string.Equals(s.show_status, "Canceled", StringComparison.OrdinalIgnoreCase);
-        bool allOut = s.season_total > 0 && s.season_aired >= s.season_total;
-
-        if (s.season_total == 0 && s.target_season > 0) return "🟡";
-        if (allOut && ended) return "✅";
+        if (shownTotal == 0 && s.target_season > 0) return "🟡";
+        if (allShownOut && ended) return "✅";
         if (ended) return "🔴";
-        if (allOut) return "🔵";
+        if (allShownOut) return "🔵";
         return "🟢";
     }
 

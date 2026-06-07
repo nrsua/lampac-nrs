@@ -209,6 +209,18 @@ public static class Strings
             ["en"] = "season complete, awaiting next",
             ["ru"] = "сезон завершён, ждём новый"
         },
+        ["voice_waiting"] = new()
+        {
+            ["uk"] = "очікуємо нові серії в озвученні",
+            ["en"] = "awaiting new episodes in this voice‑over",
+            ["ru"] = "ждём новые серии в озвучке"
+        },
+        ["tmdb_aired_note"] = new()
+        {
+            ["uk"] = "TMDB",
+            ["en"] = "TMDB",
+            ["ru"] = "TMDB"
+        },
         ["already_aired_body"] = new()
         {
             ["uk"] = "✅ <b>Сезон уже повністю вийшов</b>\n\n🎬 <b>{0}</b>\n📺 S{1}: {2}/{3} серій\n\nПереключити підписку на «авто» - сповіщати про нові сезони та серії?",

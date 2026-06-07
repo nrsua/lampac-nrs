@@ -359,7 +359,7 @@ public class ApiController : BaseController
             var text = Strings.T(L, "sub_added", Notifier.Esc(data.title), Notifier.Esc(vTxt));
             _ = Notifier.SendTextAsync(user.chat_id, text, HttpContext.RequestAborted);
 
-            if (data.target_season > 0 && show != null)
+            if (data.target_season > 0 && show != null && string.IsNullOrEmpty(v))
             {
                 var sInfo = show.seasons.FirstOrDefault(x => x.season_number == data.target_season);
                 if (sInfo != null && sInfo.episode_count > 0)
