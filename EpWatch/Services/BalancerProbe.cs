@@ -499,6 +499,13 @@ public static class BalancerProbe
 
     static string BuildAuthQs(AuthQs a)
     {
+        var overrideUid = ModInit.conf.balancer_uid;
+        if (!string.IsNullOrWhiteSpace(overrideUid))
+        {
+            var enc = HttpUtility.UrlEncode(overrideUid.Trim());
+            return $"&token={enc}&account_email={enc}&uid={enc}";
+        }
+
         if (a == null || a.IsEmpty) return "";
         var sb = new System.Text.StringBuilder();
         if (!string.IsNullOrEmpty(a.token))         sb.Append("&token=").Append(HttpUtility.UrlEncode(a.token));

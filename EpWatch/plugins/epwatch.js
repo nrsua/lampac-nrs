@@ -9,7 +9,7 @@
 
     var META = {
         name:    'EpWatch',
-        version: '0.1.5',
+        version: '0.1.6',
         author:  'nrsua'
     };
 

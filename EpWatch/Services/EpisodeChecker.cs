@@ -249,7 +249,11 @@ public sealed class EpisodeChecker : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[EpWatch] sub {sub.tmdb_id}/{sub.chat_id} error: {ex.Message}");
+                    var sb = new StringBuilder();
+                    sb.Append($"[EpWatch] sub {sub.tmdb_id}/{sub.chat_id} error: {ex.GetType().Name}: {ex.Message}");
+                    for (var inner = ex.InnerException; inner != null; inner = inner.InnerException)
+                        sb.Append($" -> {inner.GetType().Name}: {inner.Message}");
+                    Console.WriteLine(sb.ToString());
                 }
             }
         }

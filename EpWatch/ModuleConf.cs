@@ -8,6 +8,8 @@ public class ModuleConf
 
     public string lampac_host { get; set; } = "";
 
+    public string balancer_uid { get; set; } = "";
+
     public string tmdb_api_key { get; set; } = "4ef0d7355d9ffb5151e987764708ce96";
 
     public string tmdb_lang { get; set; } = "uk-UA";
