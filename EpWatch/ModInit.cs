@@ -1,6 +1,9 @@
 using System;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using EpWatch.Services;
+using Shared.Models.Base;
 using Shared.Models.Events;
 using Shared.Models.Module;
 using Shared.Models.Module.Interfaces;
@@ -12,6 +15,8 @@ public class ModInit : IModuleLoaded, IModuleConfigure
 {
     public static string modpath { get; private set; }
     public static ModuleConf conf { get; private set; } = new();
+
+    static readonly Func<bool, EventMiddleware, Task<bool>> MiddlewareHandler = OnMiddleware;
 
     public void Configure(ConfigureModel app)
     {
@@ -28,6 +33,7 @@ public class ModInit : IModuleLoaded, IModuleConfigure
 
         SyncConf();
         EventListener.UpdateInitFile += SyncConf;
+        EventListener.Middleware += MiddlewareHandler;
 
         SqlContext.Initialization(init.app.ApplicationServices);
 
@@ -46,6 +52,25 @@ public class ModInit : IModuleLoaded, IModuleConfigure
     public void Dispose()
     {
         EventListener.UpdateInitFile -= SyncConf;
+        EventListener.Middleware -= MiddlewareHandler;
+    }
+
+    static Task<bool> OnMiddleware(bool first, EventMiddleware e)
+    {
+        if (!first || string.IsNullOrWhiteSpace(conf.balancer_uid))
+            return Task.FromResult(true);
+
+        var path = e.httpContext.Request.Path.Value;
+        if (path != null &&
+            (path.StartsWith("/epwatch/", StringComparison.OrdinalIgnoreCase) ||
+             path.Equals("/epwatch.js", StringComparison.OrdinalIgnoreCase)))
+        {
+            var requestInfo = e.httpContext.Features.Get<RequestModel>();
+            if (requestInfo != null)
+                requestInfo.IsAnonymousRequest = true;
+        }
+
+        return Task.FromResult(true);
     }
 
     static void SyncConf()
