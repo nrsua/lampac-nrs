@@ -161,17 +161,25 @@ public static class BalancerProbe
 
             if (!string.IsNullOrEmpty(voiceName))
             {
-                int tid = TryFindVoiceTid(first.jo, voiceName);
-                if (tid >= 0)
+                var vinfo = FindVoice(first.jo, voiceName);
+                if (vinfo.found)
                 {
-                    var byVoiceUrl = AppendQs(first.url, $"t={tid}");
-                    Console.WriteLine($"[EpWatch] probe {entry.balanser} voice url: {byVoiceUrl}");
-                    var byVoice = await FetchByUrlAsync(byVoiceUrl, auth, timeoutSec, ct);
-                    if (byVoice != null)
+                    if (vinfo.active || vinfo.token.Length == 0)
                     {
-                        Console.WriteLine($"[EpWatch] probe {entry.balanser} t={tid} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
-                        var voiceMax = CollectMaxEpisode(byVoice, null);
+                        var voiceMax = CollectMaxEpisode(first.jo, null);
                         if (voiceMax > maxEp) maxEp = voiceMax;
+                    }
+                    else
+                    {
+                        var byVoiceUrl = AppendQs(first.url, "t=" + vinfo.token);
+                        Console.WriteLine($"[EpWatch] probe {entry.balanser} voice url: {byVoiceUrl}");
+                        var byVoice = await FetchByUrlAsync(byVoiceUrl, auth, timeoutSec, ct);
+                        if (byVoice != null)
+                        {
+                            Console.WriteLine($"[EpWatch] probe {entry.balanser} t={vinfo.token} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
+                            var voiceMax = CollectMaxEpisode(byVoice, null);
+                            if (voiceMax > maxEp) maxEp = voiceMax;
+                        }
                     }
                 }
             }
@@ -203,17 +211,25 @@ public static class BalancerProbe
 
                         if (!string.IsNullOrEmpty(voiceName))
                         {
-                            int tid = TryFindVoiceTid(second, voiceName);
-                            if (tid >= 0)
+                            var vinfo = FindVoice(second, voiceName);
+                            if (vinfo.found)
                             {
-                                var byVoiceUrl = AppendQs(followUrl, $"t={tid}");
-                                Console.WriteLine($"[EpWatch] probe {entry.balanser} voice url: {byVoiceUrl}");
-                                var byVoice = await FetchByUrlAsync(byVoiceUrl, auth, timeoutSec, ct);
-                                if (byVoice != null)
+                                if (vinfo.active || vinfo.token.Length == 0)
                                 {
-                                    Console.WriteLine($"[EpWatch] probe {entry.balanser} t={tid} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
-                                    var voiceMax = CollectMaxEpisode(byVoice, null);
+                                    var voiceMax = CollectMaxEpisode(second, null);
                                     if (voiceMax > maxEp) maxEp = voiceMax;
+                                }
+                                else
+                                {
+                                    var byVoiceUrl = AppendQs(followUrl, "t=" + vinfo.token);
+                                    Console.WriteLine($"[EpWatch] probe {entry.balanser} voice url: {byVoiceUrl}");
+                                    var byVoice = await FetchByUrlAsync(byVoiceUrl, auth, timeoutSec, ct);
+                                    if (byVoice != null)
+                                    {
+                                        Console.WriteLine($"[EpWatch] probe {entry.balanser} t={vinfo.token} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
+                                        var voiceMax = CollectMaxEpisode(byVoice, null);
+                                        if (voiceMax > maxEp) maxEp = voiceMax;
+                                    }
                                 }
                             }
                         }
@@ -349,11 +365,11 @@ public static class BalancerProbe
         }
     }
 
-    static int TryFindVoiceTid(JObject jo, string voiceName)
+    static (bool found, string token, bool active) FindVoice(JObject jo, string voiceName)
     {
-        if (string.IsNullOrEmpty(voiceName)) return -1;
+        if (string.IsNullOrEmpty(voiceName)) return (false, null, false);
         var v = jo["voice"] as JArray;
-        if (v == null) return -1;
+        if (v == null) return (false, null, false);
 
         foreach (var vi in v)
         {
@@ -362,11 +378,11 @@ public static class BalancerProbe
             if (!name.Equals(voiceName, StringComparison.OrdinalIgnoreCase)) continue;
 
             var url = vi.Value<string>("url") ?? "";
-            var m = Regex.Match(url, @"[?&]t=(\d+)");
-            if (m.Success && int.TryParse(m.Groups[1].Value, out var t))
-                return t;
+            var m = Regex.Match(url, @"[?&]t=([^&]+)");
+            bool active = vi.Value<bool?>("active") ?? false;
+            return (true, m.Success ? m.Groups[1].Value : "", active);
         }
-        return -1;
+        return (false, null, false);
     }
 
     static int CollectMaxEpisode(JObject jo, string voiceName)
