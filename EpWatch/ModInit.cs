@@ -1,4 +1,5 @@
 using System;
+using System.Reflection;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,7 +17,8 @@ public class ModInit : IModuleLoaded, IModuleConfigure
     public static string modpath { get; private set; }
     public static ModuleConf conf { get; private set; } = new();
 
-    static readonly Func<bool, EventMiddleware, Task<bool>> MiddlewareHandler = OnMiddleware;
+    static Delegate _mwHandler;
+    static FieldInfo _mwField;
 
     public void Configure(ConfigureModel app)
     {
@@ -33,7 +35,7 @@ public class ModInit : IModuleLoaded, IModuleConfigure
 
         SyncConf();
         EventListener.UpdateInitFile += SyncConf;
-        EventListener.Middleware += MiddlewareHandler;
+        HookMiddleware();
 
         SqlContext.Initialization(init.app.ApplicationServices);
 
@@ -52,13 +54,64 @@ public class ModInit : IModuleLoaded, IModuleConfigure
     public void Dispose()
     {
         EventListener.UpdateInitFile -= SyncConf;
-        EventListener.Middleware -= MiddlewareHandler;
+        UnhookMiddleware();
     }
 
-    static Task<bool> OnMiddleware(bool first, EventMiddleware e)
+    static void HookMiddleware()
+    {
+        try
+        {
+            var field = typeof(EventListener).GetField("Middleware", BindingFlags.Public | BindingFlags.Static);
+            if (field == null) return;
+
+            var delType = field.FieldType;
+            var args = delType.IsGenericType ? delType.GetGenericArguments() : Array.Empty<Type>();
+            var retType = args.Length > 0 ? args[args.Length - 1] : null;
+
+            var methodName = retType == typeof(bool) ? nameof(OnMiddlewareSync) : nameof(OnMiddlewareAsync);
+            var method = typeof(ModInit).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
+
+            var handler = Delegate.CreateDelegate(delType, method);
+            var current = (Delegate)field.GetValue(null);
+            field.SetValue(null, Delegate.Combine(current, handler));
+
+            _mwHandler = handler;
+            _mwField = field;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EpWatch] middleware hook skipped: {ex.Message}");
+        }
+    }
+
+    static void UnhookMiddleware()
+    {
+        try
+        {
+            if (_mwField == null || _mwHandler == null) return;
+            var current = (Delegate)_mwField.GetValue(null);
+            _mwField.SetValue(null, Delegate.Remove(current, _mwHandler));
+            _mwHandler = null;
+        }
+        catch { }
+    }
+
+    static bool OnMiddlewareSync(bool first, EventMiddleware e)
+    {
+        ApplyMiddleware(first, e);
+        return true;
+    }
+
+    static Task<bool> OnMiddlewareAsync(bool first, EventMiddleware e)
+    {
+        ApplyMiddleware(first, e);
+        return Task.FromResult(true);
+    }
+
+    static void ApplyMiddleware(bool first, EventMiddleware e)
     {
         if (!first || string.IsNullOrWhiteSpace(conf.balancer_uid))
-            return Task.FromResult(true);
+            return;
 
         var path = e.httpContext.Request.Path.Value;
         if (path != null &&
@@ -69,8 +122,6 @@ public class ModInit : IModuleLoaded, IModuleConfigure
             if (requestInfo != null)
                 requestInfo.IsAnonymousRequest = true;
         }
-
-        return Task.FromResult(true);
     }
 
     static void SyncConf()
