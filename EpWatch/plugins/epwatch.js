@@ -322,7 +322,7 @@
 
         Lampa.Loading.start(function () { Lampa.Loading.stop(); });
 
-        get(api('/epwatch/voices?tmdb_id=' + tmdbId + '&title=' + encodeURIComponent(title) + '&year=' + year),
+        get(api('/epwatch/voices?tmdb=' + tmdbId + '&title=' + encodeURIComponent(title) + '&year=' + year),
         function (r) {
             Lampa.Loading.stop();
             var season = (r && r.season) || card.number_of_seasons || 1;
