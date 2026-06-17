@@ -9,7 +9,7 @@
 
     var META = {
         name:    'EpWatch',
-        version: '0.1.9',
+        version: '0.2.0',
         author:  'nrsua'
     };
 
@@ -93,9 +93,9 @@
         return HOST + path + (a ? sep + a.substring(1) : '');
     }
 
-    function get(url, ok, err) {
+    function get(url, ok, err, timeout) {
         var n = new Lampa.Reguest();
-        n.timeout(15000);
+        n.timeout(timeout || 15000);
         n['native'](url, ok, err || function () { });
     }
 
@@ -381,7 +381,7 @@
                 },
                 onBack: function () { Lampa.Controller.toggle('content'); }
             });
-        });
+        }, 60000);
     }
 
     function pickSeasonAndSubscribe(card, voice, balancer, fallbackSeason, $btn, onChanged) {

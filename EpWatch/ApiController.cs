@@ -187,6 +187,7 @@ public class ApiController : BaseController
 
         var show = await TmdbClient.GetShowAsync(tmdb_id, lang, HttpContext.RequestAborted);
         int activeSeason = season > 0 ? season : (show?.latest_aired_season ?? 1);
+        int probeSeason = season > 0 ? season : 1;
         if (show == null)
             Console.WriteLine($"[EpWatch] /voices: TMDB lookup returned null for tmdb_id={tmdb_id}");
         else
@@ -207,7 +208,7 @@ public class ApiController : BaseController
             Console.WriteLine($"[EpWatch] /voices balancers: {string.Join(", ", balancers.Select(b => b.balanser + "@" + b.name))}");
 
         var probeTasks = balancers
-            .Select(b => BalancerProbe.ProbeAsync(b, sp, activeSeason, null, auth, HttpContext.RequestAborted))
+            .Select(b => BalancerProbe.ProbeAsync(b, sp, probeSeason, null, auth, HttpContext.RequestAborted))
             .ToArray();
         var probed = await Task.WhenAll(probeTasks);
 
@@ -223,7 +224,7 @@ public class ApiController : BaseController
             .Select(g => g.First())
             .ToList();
 
-        Console.WriteLine($"[EpWatch] /voices tmdb={tmdb_id} s={activeSeason} -> balancers:{balancers.Count} voices:{dedup.Count}");
+        Console.WriteLine($"[EpWatch] /voices tmdb={tmdb_id} probe_s={probeSeason} report_s={activeSeason} -> balancers:{balancers.Count} voices:{dedup.Count}");
 
         return Json(new
         {
