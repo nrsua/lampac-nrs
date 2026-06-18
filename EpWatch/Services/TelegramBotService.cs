@@ -341,6 +341,8 @@ public sealed class TelegramBotService : BackgroundService
 
     public static string FormatSubscriptionBlock(SubscriptionRow s, string L)
     {
+        var idtag = Notifier.IdTag(s.media_type, s.tmdb_id);
+
         if (string.Equals(s.media_type, "movie", StringComparison.OrdinalIgnoreCase))
         {
             var mb = new StringBuilder();
@@ -366,7 +368,6 @@ public sealed class TelegramBotService : BackgroundService
                 mb.Append("🟡 <i>").Append(Notifier.Esc(Strings.T(L, "movie_list_waiting"))).Append("</i>");
             }
 
-            var idtag = Notifier.IdTag(s.media_type, s.tmdb_id);
             if (idtag.Length > 0) mb.Append('\n').Append(idtag);
 
             mb.Append("</blockquote>");
@@ -440,7 +441,6 @@ public sealed class TelegramBotService : BackgroundService
                 sb.Append(' ').Append(s.next_air_date.Value.ToString("yyyy-MM-dd"));
         }
 
-        var idtag = Notifier.IdTag(s.media_type, s.tmdb_id);
         if (idtag.Length > 0) sb.Append('\n').Append(idtag);
 
         sb.Append("</blockquote>");
