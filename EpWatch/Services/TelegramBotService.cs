@@ -366,6 +366,9 @@ public sealed class TelegramBotService : BackgroundService
                 mb.Append("🟡 <i>").Append(Notifier.Esc(Strings.T(L, "movie_list_waiting"))).Append("</i>");
             }
 
+            var idtag = Notifier.IdTag(s.media_type, s.tmdb_id);
+            if (idtag.Length > 0) mb.Append('\n').Append(idtag);
+
             mb.Append("</blockquote>");
             return mb.ToString();
         }
@@ -436,6 +439,9 @@ public sealed class TelegramBotService : BackgroundService
             if (s.next_air_date.HasValue)
                 sb.Append(' ').Append(s.next_air_date.Value.ToString("yyyy-MM-dd"));
         }
+
+        var idtag = Notifier.IdTag(s.media_type, s.tmdb_id);
+        if (idtag.Length > 0) sb.Append('\n').Append(idtag);
 
         sb.Append("</blockquote>");
         return sb.ToString();

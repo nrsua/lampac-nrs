@@ -21,7 +21,10 @@ public static class Notifier
         if (Bot == null) return false;
 
         var sb = new System.Text.StringBuilder();
-        sb.Append("🎬 <b>").Append(Esc(sub.title)).Append("</b>\n");
+        sb.Append("🎬 ");
+        var idtag = IdTag(sub.media_type, sub.tmdb_id);
+        if (idtag.Length > 0) sb.Append(idtag).Append(' ');
+        sb.Append("<b>").Append(Esc(sub.title)).Append("</b>\n");
         sb.Append("🆕 <b>").Append(FormatSE(ep.season, ep.episode)).Append("</b>");
         if (!string.IsNullOrEmpty(ep.name))
             sb.Append(" - <i>").Append(Esc(ep.name)).Append("</i>");
@@ -61,6 +64,9 @@ public static class Notifier
         var sb = new System.Text.StringBuilder();
         sb.Append(Strings.T(lang, "movie_available_header")).Append("\n\n");
         sb.Append("<b>").Append(Esc(sub.title)).Append("</b>");
+
+        var idtag = IdTag(sub.media_type, sub.tmdb_id);
+        if (idtag.Length > 0) sb.Append('\n').Append(idtag);
 
         foreach (var g in items.GroupBy(i => i.balancer))
         {
@@ -108,6 +114,14 @@ public static class Notifier
     }
 
     public static string FormatSE(int s, int e) => $"S{s:D2}E{e:D2}";
+
+    public static string IdTag(string mediaType, int tmdbId)
+    {
+        var fmt = ModInit.conf.id_format;
+        if (string.IsNullOrWhiteSpace(fmt)) return "";
+        var type = string.Equals(mediaType, "movie", StringComparison.OrdinalIgnoreCase) ? "movie" : "tv";
+        return fmt.Replace("{type}", type).Replace("{id}", tmdbId.ToString());
+    }
 
     public static string ProgressBar(int current, int total, int width = 10)
     {

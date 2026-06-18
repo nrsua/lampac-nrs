@@ -27,4 +27,6 @@ public class ModuleConf
     public bool tvdb_enable { get; set; } = true;
 
     public string tvdb_host { get; set; } = "https://skyhook.sonarr.tv/v1/tvdb";
+
+    public string id_format { get; set; } = "{type}|{id}";
 }
