@@ -304,6 +304,12 @@ public static class Strings
             ["uk"] = "Чекаємо далі",
             ["en"] = "Waiting",
             ["ru"] = "Ждём дальше"
+        },
+        ["open_button"] = new()
+        {
+            ["uk"] = "▶️ Дивитись у Lampa",
+            ["en"] = "▶️ Watch in Lampa",
+            ["ru"] = "▶️ Смотреть в Lampa"
         }
     };
 

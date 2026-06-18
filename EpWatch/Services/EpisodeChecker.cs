@@ -186,7 +186,7 @@ public sealed class EpisodeChecker : BackgroundService
                                 AddSummary(summary, sub, ep);
                                 notified++;
                             }
-                            else if (await Notifier.SendEpisodeAsync(sub, ep, ct))
+                            else if (await Notifier.SendEpisodeAsync(sub, ep, ct, lang))
                             {
                                 notified++;
                             }
@@ -224,7 +224,7 @@ public sealed class EpisodeChecker : BackgroundService
                                     AddSummary(summary, sub, epInfo);
                                     notified++;
                                 }
-                                else if (await Notifier.SendEpisodeAsync(sub, epInfo, ct))
+                                else if (await Notifier.SendEpisodeAsync(sub, epInfo, ct, lang))
                                 {
                                     notified++;
                                 }

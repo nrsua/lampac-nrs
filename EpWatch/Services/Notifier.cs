@@ -16,7 +16,7 @@ public static class Notifier
 
     public const string PARSE_MODE = "HTML";
 
-    public static async Task<bool> SendEpisodeAsync(SubscriptionRow sub, TmdbEpisode ep, CancellationToken ct)
+    public static async Task<bool> SendEpisodeAsync(SubscriptionRow sub, TmdbEpisode ep, CancellationToken ct, string lang = Strings.DefaultLang)
     {
         if (Bot == null) return false;
 
@@ -41,13 +41,16 @@ public static class Notifier
             sb.Append("\n<blockquote expandable><i>").Append(Esc(d)).Append("</i></blockquote>");
         }
 
+        var openBtn = OpenButton(sub.media_type, sub.tmdb_id, lang);
+        object kb = openBtn != null ? TgMarkup.Inline(new[] { openBtn }) : null;
+
         try
         {
             var msg = sb.ToString();
             if (!string.IsNullOrEmpty(ep.still_url))
-                await Bot.SendPhotoAsync(sub.chat_id, ep.still_url, msg, PARSE_MODE, ct);
+                await Bot.SendPhotoAsync(sub.chat_id, ep.still_url, msg, PARSE_MODE, kb, ct);
             else
-                await Bot.SendMessageAsync(sub.chat_id, msg, null, PARSE_MODE, ct);
+                await Bot.SendMessageAsync(sub.chat_id, msg, kb, PARSE_MODE, ct);
             return true;
         }
         catch (Exception ex)
@@ -75,10 +78,14 @@ public static class Notifier
                 sb.Append("\n   🎙 ").Append(Esc(voice));
         }
 
-        var kb = TgMarkup.InlineKeyboard(
-            new (string, string)[] { (Strings.T(lang, "movie_btn_wait"), "mvwait_" + sub.Id) },
-            new (string, string)[] { (Strings.T(lang, "movie_btn_stop"), "mvstop_" + sub.Id) }
-        );
+        var rows = new List<object[]>
+        {
+            new[] { TgMarkup.BtnCallback(Strings.T(lang, "movie_btn_wait"), "mvwait_" + sub.Id) },
+            new[] { TgMarkup.BtnCallback(Strings.T(lang, "movie_btn_stop"), "mvstop_" + sub.Id) }
+        };
+        var openBtn = OpenButton(sub.media_type, sub.tmdb_id, lang);
+        if (openBtn != null) rows.Add(new[] { openBtn });
+        var kb = TgMarkup.Inline(rows.ToArray());
 
         try
         {
@@ -121,6 +128,23 @@ public static class Notifier
         if (string.IsNullOrWhiteSpace(fmt)) return "";
         var type = string.Equals(mediaType, "movie", StringComparison.OrdinalIgnoreCase) ? "movie" : "tv";
         return fmt.Replace("{type}", type).Replace("{id}", tmdbId.ToString());
+    }
+
+    static object OpenButton(string mediaType, int tmdbId, string lang)
+    {
+        if (!ModInit.conf.push_open_button) return null;
+        var url = OpenUrl(mediaType, tmdbId);
+        if (string.IsNullOrEmpty(url)) return null;
+        return TgMarkup.BtnUrl(Strings.T(lang, "open_button"), url);
+    }
+
+    static string OpenUrl(string mediaType, int tmdbId)
+    {
+        if (tmdbId <= 0) return "";
+        var b = BalancerProbe.HostBase()?.TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(b)) return "";
+        var media = string.Equals(mediaType, "movie", StringComparison.OrdinalIgnoreCase) ? "movie" : "tv";
+        return $"{b}/?card={tmdbId}&media={media}&source=tmdb";
     }
 
     public static string ProgressBar(int current, int total, int width = 10)

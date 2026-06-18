@@ -78,13 +78,14 @@ public sealed class TelegramApi
             reply_markup = replyMarkup
         }, ct);
 
-    public Task SendPhotoAsync(long chatId, string photoUrl, string caption, string parseMode, CancellationToken ct)
+    public Task SendPhotoAsync(long chatId, string photoUrl, string caption, string parseMode, object replyMarkup, CancellationToken ct)
         => CallAsync("sendPhoto", new
         {
             chat_id = chatId,
             photo = photoUrl,
             caption,
-            parse_mode = parseMode
+            parse_mode = parseMode,
+            reply_markup = replyMarkup
         }, ct);
 
     public Task SetMyCommandsAsync(object[] commands, object scope, string languageCode, CancellationToken ct)
@@ -128,4 +129,10 @@ public static class TgMarkup
             .ToArray();
         return new { inline_keyboard };
     }
+
+    public static object BtnCallback(string text, string data) => new { text, callback_data = data };
+
+    public static object BtnUrl(string text, string url) => new { text, url };
+
+    public static object Inline(params object[][] rows) => new { inline_keyboard = rows };
 }
