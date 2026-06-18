@@ -9,7 +9,7 @@
 
     var META = {
         name:    'EpWatch',
-        version: '0.2.0',
+        version: '0.2.1',
         author:  'nrsua'
     };
 
@@ -46,6 +46,8 @@
         epwatch_linked:                { uk: 'Telegram-бот прив’язаний',        en: 'Telegram bot linked',                 ru: 'Telegram-бот привязан' },
         epwatch_close:                 { uk: 'Закрити',                         en: 'Close',                               ru: 'Закрыть' },
         epwatch_settings_unlink:       { uk: 'Відв’язати Telegram',             en: 'Unlink Telegram',                     ru: 'Отвязать Telegram' },
+        epwatch_settings_uid:          { uk: 'Перевизначення Sync UID',         en: 'Sync UID override',                   ru: 'Переопределение Sync UID' },
+        epwatch_settings_uid_desc:     { uk: 'Якщо заповнено, цей UID використовується замість локального lampa_uid (лише для EpWatch). Однаковий на різних пристроях - спільні підписки.', en: 'If set, this UID is used instead of the local lampa_uid (EpWatch only). The same value on different devices - shared subscriptions.', ru: 'Если заполнено, этот UID используется вместо локального lampa_uid (только для EpWatch). Одинаковый на разных устройствах - общие подписки.' },
         epwatch_unlink_confirm:        { uk: 'Видалити прив’язку та всі підписки?', en: 'Remove the link and all subscriptions?', ru: 'Удалить привязку и все подписки?' },
         epwatch_unlink_done:           { uk: 'Прив’язку видалено',              en: 'Link removed',                        ru: 'Привязка удалена' },
         epwatch_yes:                   { uk: 'Так',                             en: 'Yes',                                 ru: 'Да' },
@@ -77,7 +79,17 @@
         } catch (e) { return ''; }
     }
 
+    function customUid() {
+        try { return (('' + (Lampa.Storage.get('epwatch_uid', '') || '')).trim()); }
+        catch (e) { return ''; }
+    }
+
     function authQs() {
+        var cu = customUid();
+        if (cu) {
+            var e = encodeURIComponent(cu);
+            return '&token=' + e + '&account_email=' + e + '&uid=' + e;
+        }
         var qs = '';
         try {
             var t = Lampa.Storage.get('token', '');
@@ -731,6 +743,16 @@
             field: {
                 name:        L('epwatch_settings_lang'),
                 description: L('epwatch_settings_lang_desc')
+            },
+            onChange: function () {}
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'epwatch',
+            param: { name: 'epwatch_uid', type: 'input', values: '', 'default': '' },
+            field: {
+                name:        L('epwatch_settings_uid'),
+                description: L('epwatch_settings_uid_desc')
             },
             onChange: function () {}
         });
