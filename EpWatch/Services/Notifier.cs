@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using EpWatch.Models;
@@ -48,6 +50,38 @@ public static class Notifier
         catch (Exception ex)
         {
             Console.WriteLine($"[EpWatch] notify failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    public static async Task<bool> SendMovieAvailableAsync(SubscriptionRow sub, List<(string balancer, string voice)> items, string lang, CancellationToken ct)
+    {
+        if (Bot == null || items == null || items.Count == 0) return false;
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append(Strings.T(lang, "movie_available_header")).Append("\n\n");
+        sb.Append("<b>").Append(Esc(sub.title)).Append("</b>");
+
+        foreach (var g in items.GroupBy(i => i.balancer))
+        {
+            sb.Append("\n🌐 ").Append(Esc(g.Key));
+            foreach (var voice in g.Select(x => x.voice).Where(v => !string.IsNullOrEmpty(v)).Distinct())
+                sb.Append("\n   🎙 ").Append(Esc(voice));
+        }
+
+        var kb = TgMarkup.InlineKeyboard(
+            new (string, string)[] { (Strings.T(lang, "movie_btn_wait"), "mvwait_" + sub.Id) },
+            new (string, string)[] { (Strings.T(lang, "movie_btn_stop"), "mvstop_" + sub.Id) }
+        );
+
+        try
+        {
+            await Bot.SendMessageAsync(sub.chat_id, sb.ToString(), kb, PARSE_MODE, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EpWatch] movie notify failed: {ex.Message}");
             return false;
         }
     }

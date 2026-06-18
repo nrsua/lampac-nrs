@@ -57,7 +57,11 @@
         epwatch_season_airing:         { uk: 'виходить',                        en: 'airing',                              ru: 'выходит' },
         epwatch_season_aired:          { uk: 'завершено',                       en: 'aired',                               ru: 'вышел' },
         epwatch_season_eps:            { uk: 'серій',                           en: 'episodes',                            ru: 'серий' },
-        epwatch_tmdb_short:            { uk: 'TMDB',                            en: 'TMDB',                                ru: 'TMDB' }
+        epwatch_tmdb_short:            { uk: 'TMDB',                            en: 'TMDB',                                ru: 'TMDB' },
+        epwatch_movie_pick:            { uk: 'Оберіть балансир',                en: 'Pick a balancer',                     ru: 'Выберите балансер' },
+        epwatch_movie_no_balancers:    { uk: 'Балансири недоступні',            en: 'No balancers available',              ru: 'Балансиры недоступны' },
+        epwatch_movie_subscribed:      { uk: '🎬 Підписку на фільм оформлено',  en: '🎬 Subscribed to movie',             ru: '🎬 Подписка на фильм оформлена' },
+        epwatch_movie_any_balancer:    { uk: 'будь-який балансир',              en: 'any balancer',                        ru: 'любой балансер' }
     };
 
     function token() {
@@ -188,22 +192,28 @@
             var sub = element.epwatch;
             if (!sub) return;
 
-            var voice = sub.voice || anyWord;
-            var srcTag = sub.structure_source === 'tvdb' ? ' · TVDB'
-                       : sub.structure_source === 'absolute' ? ' · ABS' : '';
-            var seasonNum = sub.target_season && sub.target_season > 0 ? sub.target_season : sub.last_season;
-            var hasVoice = !!sub.voice;
-            var shownAired = hasVoice ? (sub.last_voice_episode || 0) : (sub.season_aired || 0);
-            var tmdbAired = sub.season_aired || 0;
-            var position;
-            if (sub.season_total && sub.season_total > 0)
-                position = 'S' + seasonNum + ' E' + shownAired + '/' + sub.season_total;
-            else
-                position = 'S' + seasonNum + ' E' + (hasVoice ? (sub.last_voice_episode || 0) : sub.last_episode);
+            var isMovie = sub.media_type === 'movie';
+            var position, voiceLine, tmdbHint = '';
 
-            var tmdbHint = '';
-            if (hasVoice && sub.season_total && sub.season_total > 0 && tmdbAired > shownAired)
-                tmdbHint = '<span class="card__subscribe-tmdb">' + L('epwatch_tmdb_short') + ' ' + tmdbAired + '/' + sub.season_total + '</span>';
+            if (isMovie) {
+                position = '🎬 ' + (sub.seen_voices ? '✅' : '⏳');
+                voiceLine = sub.balancer || L('epwatch_movie_any_balancer');
+            } else {
+                var voice = sub.voice || anyWord;
+                var srcTag = sub.structure_source === 'tvdb' ? ' · TVDB'
+                           : sub.structure_source === 'absolute' ? ' · ABS' : '';
+                var seasonNum = sub.target_season && sub.target_season > 0 ? sub.target_season : sub.last_season;
+                var hasVoice = !!sub.voice;
+                var shownAired = hasVoice ? (sub.last_voice_episode || 0) : (sub.season_aired || 0);
+                var tmdbAired = sub.season_aired || 0;
+                if (sub.season_total && sub.season_total > 0)
+                    position = 'S' + seasonNum + ' E' + shownAired + '/' + sub.season_total;
+                else
+                    position = 'S' + seasonNum + ' E' + (hasVoice ? (sub.last_voice_episode || 0) : sub.last_episode);
+                if (hasVoice && sub.season_total && sub.season_total > 0 && tmdbAired > shownAired)
+                    tmdbHint = '<span class="card__subscribe-tmdb">' + L('epwatch_tmdb_short') + ' ' + tmdbAired + '/' + sub.season_total + '</span>';
+                voiceLine = voice + srcTag;
+            }
 
             try {
                 var $card = card.render();
@@ -213,7 +223,7 @@
                         '<div class="card__subscribe">' +
                             '<div class="card__subscribe-status on"></div>' +
                             '<div class="card__subscribe-position">' + position + tmdbHint + '</div>' +
-                            '<div class="card__subscribe-voice">' + voice + srcTag + '</div>' +
+                            '<div class="card__subscribe-voice">' + voiceLine + '</div>' +
                         '</div>';
                     $view.after(html);
                 }
@@ -223,7 +233,7 @@
                 Lampa.Activity.push({
                     url: '', component: 'full',
                     id: d.tmdb_id || d.id,
-                    method: 'tv', card: d, source: 'tmdb'
+                    method: isMovie ? 'movie' : 'tv', card: d, source: 'tmdb'
                 });
             };
         };
@@ -286,8 +296,11 @@
     }
 
     function overrideButton(obj) {
-        if (!obj || !obj.card || !obj.card.number_of_seasons) return;
+        if (!obj || !obj.card) return;
         var card = obj.card;
+        var isMovie = !card.number_of_seasons &&
+            (obj.method === 'movie' || !!card.release_date || (!!card.title && !card.name));
+        if (!card.number_of_seasons && !isMovie) return;
         var $btn;
         try { $btn = obj.activity.render().find('.button--subscribe'); } catch (e) { return; }
         if (!$btn || !$btn.length) return;
@@ -309,7 +322,8 @@
                 if (!fresh || !fresh.linked) return showLink(function () {
                     Lampa.Controller.toggle('content');
                 });
-                showVoiceMenu(card, $btn, fresh, refreshFlag);
+                if (isMovie) showMovieMenu(card, $btn, fresh, refreshFlag);
+                else showVoiceMenu(card, $btn, fresh, refreshFlag);
             });
         });
     }
@@ -468,6 +482,65 @@
                 });
             }
         });
+    }
+
+    function showMovieMenu(card, $btn, status, onChanged) {
+        var title  = card.title || card.name || '';
+        var year   = card.release_date ? parseInt(card.release_date) : (card.year || 0);
+        var tmdbId = card.id || 0;
+
+        Lampa.Loading.start(function () { Lampa.Loading.stop(); });
+
+        get(api('/epwatch/balancers?tmdb_id=' + tmdbId + '&title=' + encodeURIComponent(title) + '&year=' + year),
+        function (r) {
+            Lampa.Loading.stop();
+            var items = [];
+
+            if (status && status.subscribed)
+                items.push({ title: L('epwatch_unsub'), unsubscribe: true });
+
+            if (r && r.balancers && r.balancers.length) {
+                r.balancers.forEach(function (b) {
+                    items.push({ title: '🌐 ' + (b.name || b.balancer), balancer: b.balancer });
+                });
+            } else {
+                items.push({ title: L('epwatch_movie_no_balancers'), empty: true });
+            }
+
+            Lampa.Select.show({
+                title: L('epwatch_movie_pick') + ' [BETA]',
+                items: items,
+                onSelect: function (a) {
+                    Lampa.Controller.toggle('content');
+                    if (a.empty) return;
+                    if (a.unsubscribe) return doUnsub(card, $btn, null, onChanged);
+                    doMovieSub(card, a.balancer, $btn, onChanged);
+                },
+                onBack: function () { Lampa.Controller.toggle('content'); }
+            });
+        },
+        function () {
+            Lampa.Loading.stop();
+            Lampa.Noty.show(L('epwatch_err_network'));
+        }, 60000);
+    }
+
+    function doMovieSub(card, balancer, $btn, onChanged) {
+        var payload = {
+            tmdb_id:     card.id,
+            title:       card.title || card.name || '',
+            media_type:  'movie',
+            balancer:    balancer || '',
+            poster_path: card.poster_path || ''
+        };
+        post(api('/epwatch/subscribe'), payload, function (r) {
+            if (r && r.success) {
+                Lampa.Noty.show(L('epwatch_movie_subscribed'));
+                $btn.addClass('active').find('path').attr('fill', 'currentColor');
+                if (typeof onChanged === 'function') onChanged();
+            } else if (r && r.msg === 'not_linked') showLink(function () { Lampa.Controller.toggle('content'); });
+            else Lampa.Noty.show(L('epwatch_err_unknown') + ': ' + ((r && r.msg) || ''));
+        }, function () { Lampa.Noty.show(L('epwatch_err_network')); });
     }
 
     function openExternal(link) {

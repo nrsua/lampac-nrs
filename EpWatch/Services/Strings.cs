@@ -244,6 +244,66 @@ public static class Strings
             ["uk"] = "✅ <b>Перейшли на авто-режим</b>\n\n🎬 <b>{0}</b>",
             ["en"] = "✅ <b>Switched to auto</b>\n\n🎬 <b>{0}</b>",
             ["ru"] = "✅ <b>Переключено в авто-режим</b>\n\n🎬 <b>{0}</b>"
+        },
+        ["movie_available_header"] = new()
+        {
+            ["uk"] = "🎬 <b>Фільм доступний</b>",
+            ["en"] = "🎬 <b>Movie available</b>",
+            ["ru"] = "🎬 <b>Фильм доступен</b>"
+        },
+        ["movie_btn_wait"] = new()
+        {
+            ["uk"] = "⏳ Чекати інші озвучення",
+            ["en"] = "⏳ Wait for other voices",
+            ["ru"] = "⏳ Ждать другие озвучки"
+        },
+        ["movie_btn_stop"] = new()
+        {
+            ["uk"] = "❌ Відписатися",
+            ["en"] = "❌ Unsubscribe",
+            ["ru"] = "❌ Отписаться"
+        },
+        ["movie_sub_added"] = new()
+        {
+            ["uk"] = "🎬 <b>Підписка на фільм</b>\n\n<b>{0}</b>\n🌐 {1}\n\nСповіщу про нові озвучення на цьому балансирі.",
+            ["en"] = "🎬 <b>Movie subscription</b>\n\n<b>{0}</b>\n🌐 {1}\n\nI'll notify you about new voices on this balancer.",
+            ["ru"] = "🎬 <b>Подписка на фильм</b>\n\n<b>{0}</b>\n🌐 {1}\n\nСообщу о новых озвучках на этом балансере."
+        },
+        ["movie_unsub"] = new()
+        {
+            ["uk"] = "❌ <b>Підписку на фільм скасовано</b>\n\n<b>{0}</b>",
+            ["en"] = "❌ <b>Movie subscription removed</b>\n\n<b>{0}</b>",
+            ["ru"] = "❌ <b>Подписка на фильм отменена</b>\n\n<b>{0}</b>"
+        },
+        ["movie_any_balancer"] = new()
+        {
+            ["uk"] = "будь-який балансир",
+            ["en"] = "any balancer",
+            ["ru"] = "любой балансер"
+        },
+        ["movie_list_available"] = new()
+        {
+            ["uk"] = "доступний",
+            ["en"] = "available",
+            ["ru"] = "доступен"
+        },
+        ["movie_list_waiting"] = new()
+        {
+            ["uk"] = "очікується",
+            ["en"] = "awaiting",
+            ["ru"] = "ожидается"
+        },
+        ["movie_waiting_new"] = new()
+        {
+            ["uk"] = "чекаємо нові озвучення",
+            ["en"] = "waiting for new voices",
+            ["ru"] = "ждём новые озвучки"
+        },
+        ["cb_waiting"] = new()
+        {
+            ["uk"] = "Чекаємо далі",
+            ["en"] = "Waiting",
+            ["ru"] = "Ждём дальше"
         }
     };
 

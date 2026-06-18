@@ -175,4 +175,41 @@ public static class TmdbClient
         }
         catch { return result; }
     }
+
+    public static async Task<TmdbShow> GetMovieAsync(int tmdbId, string lang, CancellationToken ct)
+    {
+        var locale = ResolveLang(lang);
+        var key = $"movie:{tmdbId}:{locale}";
+        var hit = GetCached<TmdbShow>(key);
+        if (hit != null) return hit;
+
+        var api = ApiKey();
+        if (string.IsNullOrEmpty(api)) return null;
+
+        try
+        {
+            using var resp = await http.GetAsync(
+                $"https://api.themoviedb.org/3/movie/{tmdbId}?api_key={api}&language={locale}&append_to_response=external_ids", ct);
+            if (!resp.IsSuccessStatusCode) return null;
+
+            var jo = JObject.Parse(await resp.Content.ReadAsStringAsync(ct));
+            var show = new TmdbShow
+            {
+                id = tmdbId,
+                name = jo.Value<string>("title"),
+                original_name = jo.Value<string>("original_title"),
+                original_language = jo.Value<string>("original_language") ?? "",
+                poster_path = jo.Value<string>("poster_path"),
+                status = jo.Value<string>("status") ?? "",
+                imdb_id = jo.Value<string>("imdb_id") ?? (jo["external_ids"] as JObject)?.Value<string>("imdb_id") ?? ""
+            };
+
+            if (DateTime.TryParse(jo.Value<string>("release_date"), out var rd))
+                show.first_air_year = rd.Year;
+
+            SetCached(key, show, TimeSpan.FromHours(6));
+            return show;
+        }
+        catch { return null; }
+    }
 }

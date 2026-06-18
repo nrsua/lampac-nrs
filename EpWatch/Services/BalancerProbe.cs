@@ -53,11 +53,11 @@ public static class BalancerProbe
     }
 
     public static async Task<List<BalancerEntry>> GetAvailableAsync(
-        ShowParams sp, AuthQs auth, CancellationToken ct)
+        ShowParams sp, AuthQs auth, CancellationToken ct, bool movie = false)
     {
         var url =
             $"{HostBase()}/lite/events" +
-            "?serial=1&source=tmdb";
+            (movie ? "?serial=0&source=tmdb" : "?serial=1&source=tmdb");
 
         if (sp != null)
         {
@@ -304,6 +304,61 @@ public static class BalancerProbe
             return tree.Keys.OrderBy(x => x).ToList();
 
         return CollectMaxEpisode(disc.jo, null) > 0 ? new List<int> { 1 } : new List<int>();
+    }
+
+    public static async Task<(bool available, List<string> voices)> ProbeMovieAsync(
+        BalancerEntry entry, ShowParams sp, AuthQs auth, CancellationToken ct)
+    {
+        var timeoutSec = Math.Max(3, ModInit.conf.balancer_timeout_seconds);
+        var qs = BuildShowQs(sp, entry.balanser, auth, movie: true) + "&rjson=true";
+        var url = AppendQs(NormalizeUrl(entry.url), qs);
+
+        var jo = await GetJsonAsync(url, timeoutSec, ct);
+        if (jo == null) return (false, new List<string>());
+
+        if (jo.Value<string>("type") == "similar")
+        {
+            Console.WriteLine($"[EpWatch] movie {entry.balanser} similar -> ignored (no exact match)");
+            return (false, new List<string>());
+        }
+
+        var data = jo["data"] as JArray;
+        var names = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (data != null)
+        {
+            foreach (var d in data)
+            {
+                var tr = d.Value<string>("translate") ?? d.Value<string>("voice_name") ?? d.Value<string>("details");
+                if (!string.IsNullOrWhiteSpace(tr) && seen.Add(tr)) names.Add(tr);
+            }
+        }
+
+        var vextra = new List<BalancerVoice>();
+        CollectVoices(jo, vextra, entry.balanser);
+        foreach (var v in vextra)
+            if (!string.IsNullOrWhiteSpace(v.name) && seen.Add(v.name)) names.Add(v.name);
+
+        bool playable = (data?.Count ?? 0) > 0 || names.Count > 0;
+
+        Console.WriteLine($"[EpWatch] movie probe {entry.balanser} -> available={playable}, voices={names.Count} [{string.Join(", ", names)}]");
+        return (playable, names);
+    }
+
+    static async Task<JObject> GetJsonAsync(string url, int timeoutSec, CancellationToken ct)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(timeoutSec));
+        try
+        {
+            using var resp = await http.GetAsync(url, cts.Token);
+            if (!resp.IsSuccessStatusCode) return null;
+            var body = await resp.Content.ReadAsStringAsync(cts.Token);
+            if (string.IsNullOrWhiteSpace(body) || body == "null") return null;
+            try { return JObject.Parse(body); } catch { return null; }
+        }
+        catch { return null; }
     }
 
     static async Task<JObject> FetchByUrlAsync(string rawUrl, AuthQs auth, int timeoutSec, CancellationToken ct)
@@ -568,10 +623,10 @@ public static class BalancerProbe
         "fancdn", "kinotochka", "remux", "kinogo", "kinobase", "getstv", "leproduction"
     };
 
-    static string BuildShowQs(ShowParams sp, string balancer, AuthQs auth)
+    static string BuildShowQs(ShowParams sp, string balancer, AuthQs auth, bool movie = false)
     {
         var sb = new System.Text.StringBuilder();
-        sb.Append("serial=1&source=tmdb");
+        sb.Append(movie ? "serial=0&source=tmdb" : "serial=1&source=tmdb");
         if (sp != null)
         {
             if (sp.tmdb_id > 0) sb.Append("&tmdb_id=").Append(sp.tmdb_id).Append("&id=").Append(sp.tmdb_id);

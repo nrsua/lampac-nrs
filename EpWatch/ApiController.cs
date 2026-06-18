@@ -236,6 +236,38 @@ public class ApiController : BaseController
     }
     #endregion
 
+    #region /epwatch/balancers
+    [HttpGet]
+    [Route("epwatch/balancers")]
+    public async Task<ActionResult> Balancers(int tmdb_id, string title, int year = 0)
+    {
+        RememberLocalHost();
+
+        var lang = await UserLang();
+        var auth = RequestAuth();
+        var movie = await TmdbClient.GetMovieAsync(tmdb_id, lang, HttpContext.RequestAborted);
+
+        var sp = new Models.ShowParams
+        {
+            tmdb_id = tmdb_id,
+            title = !string.IsNullOrWhiteSpace(movie?.name) ? movie.name : (title ?? ""),
+            original_title = movie?.original_name ?? "",
+            original_language = movie?.original_language ?? "",
+            imdb_id = movie?.imdb_id ?? "",
+            year = year > 0 ? year : (movie?.first_air_year ?? 0)
+        };
+
+        var balancers = await BalancerProbe.GetAvailableAsync(sp, auth, HttpContext.RequestAborted, movie: true);
+        Console.WriteLine($"[EpWatch] /balancers tmdb={tmdb_id} -> {balancers.Count}");
+
+        return Json(new
+        {
+            success = true,
+            balancers = balancers.Select(b => new { name = b.name, balancer = b.balanser }).ToArray()
+        });
+    }
+    #endregion
+
     public class SubscribeBody
     {
         public int tmdb_id { get; set; }
@@ -247,6 +279,7 @@ public class ApiController : BaseController
         public int episode { get; set; }
         public int voice_episode { get; set; }
         public int target_season { get; set; }
+        public string media_type { get; set; }
     }
 
     #region /epwatch/subscribe
@@ -282,6 +315,9 @@ public class ApiController : BaseController
         using var db = SqlContext.Create();
         var user = await db.users.FirstOrDefaultAsync(u => u.lampac_uid == uid);
         if (user == null) return Json(new { success = false, msg = "not_linked" });
+
+        if (string.Equals(data.media_type, "movie", StringComparison.OrdinalIgnoreCase))
+            return await SubscribeMovie(db, user, data);
 
         var v = data.voice ?? "";
         var existing = await db.subs.FirstOrDefaultAsync(s =>
@@ -453,6 +489,93 @@ public class ApiController : BaseController
 
         return Json(new { success = true });
     }
+
+    async Task<ActionResult> SubscribeMovie(SqlContext db, TgUserRow user, SubscribeBody data)
+    {
+        var L = Strings.Normalize(user.lang);
+        var movie = await TmdbClient.GetMovieAsync(data.tmdb_id, L, HttpContext.RequestAborted);
+        var title = !string.IsNullOrWhiteSpace(movie?.name) ? movie.name : data.title;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var auth = RequestAuth();
+            var sp = new Models.ShowParams
+            {
+                tmdb_id = data.tmdb_id,
+                title = title,
+                original_title = movie?.original_name ?? "",
+                original_language = movie?.original_language ?? "",
+                imdb_id = movie?.imdb_id ?? "",
+                year = movie?.first_air_year ?? 0
+            };
+
+            var balancers = await BalancerProbe.GetAvailableAsync(sp, auth, HttpContext.RequestAborted, movie: true);
+            if (!string.IsNullOrEmpty(data.balancer))
+                balancers = balancers.Where(b => string.Equals(b.balanser, data.balancer, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            foreach (var b in balancers)
+            {
+                var probed = await BalancerProbe.ProbeMovieAsync(b, sp, auth, HttpContext.RequestAborted);
+                if (!probed.available) continue;
+                var vlist = probed.voices.Count > 0 ? probed.voices : new System.Collections.Generic.List<string> { "" };
+                foreach (var v in vlist) seen.Add(b.balanser + "\t" + v);
+            }
+            Console.WriteLine($"[EpWatch] /subscribe movie baseline: {seen.Count} voices already present");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EpWatch] /subscribe movie baseline probe failed: {ex.Message}");
+        }
+
+        var seedCsv = string.Join("\n", seen);
+
+        var existing = await db.subs.FirstOrDefaultAsync(s =>
+            s.chat_id == user.chat_id && s.tmdb_id == data.tmdb_id && s.media_type == "movie");
+
+        if (existing == null)
+        {
+            db.subs.Add(new SubscriptionRow
+            {
+                chat_id = user.chat_id,
+                tmdb_id = data.tmdb_id,
+                title = title,
+                media_type = "movie",
+                voice = "",
+                balancer = data.balancer ?? "",
+                seen_voices = seedCsv,
+                poster_path = data.poster_path ?? movie?.poster_path ?? "",
+                subscribed_at = DateTime.UtcNow,
+                last_checked_at = DateTime.UtcNow,
+                next_check_at = DateTime.UtcNow.AddMinutes(Math.Max(5, ModInit.conf.check_interval_minutes))
+            });
+        }
+        else
+        {
+            existing.title = title;
+            existing.balancer = data.balancer ?? existing.balancer;
+            existing.seen_voices = seedCsv;
+            existing.poster_path = data.poster_path ?? existing.poster_path;
+            existing.next_check_at = DateTime.UtcNow.AddMinutes(Math.Max(5, ModInit.conf.check_interval_minutes));
+            db.subs.Update(existing);
+        }
+
+        try { await db.SaveChangesAsync(); }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EpWatch] /subscribe movie save failed: {ex.Message}");
+            return Json(new { success = false, msg = "db_error" });
+        }
+
+        if (Notifier.Ready)
+        {
+            var balName = string.IsNullOrEmpty(data.balancer) ? Strings.T(L, "movie_any_balancer") : data.balancer;
+            _ = Notifier.SendTextAsync(user.chat_id, Strings.T(L, "movie_sub_added", Notifier.Esc(title), Notifier.Esc(balName)), HttpContext.RequestAborted);
+        }
+
+        Console.WriteLine($"[EpWatch] /subscribe MOVIE chat_id={user.chat_id} tmdb_id={data.tmdb_id} balancer=\"{data.balancer}\"");
+        return Json(new { success = true });
+    }
     #endregion
 
     public class UnsubscribeBody
@@ -542,6 +665,8 @@ public class ApiController : BaseController
                 target_season = s.target_season,
                 show_status = s.show_status,
                 structure_source = s.structure_source,
+                media_type = s.media_type,
+                seen_voices = s.seen_voices,
                 last_checked_at = s.last_checked_at,
                 subscribed_at = s.subscribed_at
             })

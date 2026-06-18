@@ -265,6 +265,29 @@ public sealed class TelegramBotService : BackgroundService
             }
             await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_notfound"), ct);
         }
+        else if (data.StartsWith("mvstop_"))
+        {
+            long.TryParse(data.Substring(7), out long subId);
+            if (subId > 0)
+            {
+                using var db = SqlContext.Create();
+                var sub = await db.subs.FirstOrDefaultAsync(s => s.Id == subId, ct);
+                if (sub != null && sub.chat_id == chatId)
+                {
+                    var rmTitle = sub.title;
+                    db.subs.Remove(sub);
+                    await db.SaveChangesAsync(ct);
+                    await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_removed"), ct);
+                    await bot.SendMessageAsync(chatId, Strings.T(L, "movie_unsub", Notifier.Esc(rmTitle)), null, Notifier.PARSE_MODE, ct);
+                    return;
+                }
+            }
+            await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_notfound"), ct);
+        }
+        else if (data.StartsWith("mvwait_"))
+        {
+            await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_waiting"), ct);
+        }
         else if (data == "noop")
         {
             await bot.AnswerCallbackQueryAsync(id, null, ct);
@@ -300,8 +323,53 @@ public sealed class TelegramBotService : BackgroundService
         await bot.SendMessageAsync(chatId, sb.ToString(), kb, Notifier.PARSE_MODE, ct);
     }
 
+    static List<string> ParseSeenVoices(string seen)
+    {
+        var list = new List<string>();
+        if (string.IsNullOrEmpty(seen)) return list;
+
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in seen.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var idx = entry.IndexOf('\t');
+            var voice = idx >= 0 ? entry.Substring(idx + 1) : entry;
+            if (!string.IsNullOrWhiteSpace(voice) && set.Add(voice))
+                list.Add(voice);
+        }
+        return list;
+    }
+
     public static string FormatSubscriptionBlock(SubscriptionRow s, string L)
     {
+        if (string.Equals(s.media_type, "movie", StringComparison.OrdinalIgnoreCase))
+        {
+            var mb = new StringBuilder();
+            mb.Append("<blockquote>");
+            mb.Append("🎬 <b>").Append(Notifier.Esc(s.title)).Append("</b>\n");
+            var bal = string.IsNullOrEmpty(s.balancer) ? Strings.T(L, "movie_any_balancer") : s.balancer;
+            mb.Append("🌐 ").Append(Notifier.Esc(bal)).Append('\n');
+
+            var voices = ParseSeenVoices(s.seen_voices);
+            if (voices.Count > 0)
+            {
+                foreach (var v in voices)
+                    mb.Append("🎙 ").Append(Notifier.Esc(v)).Append('\n');
+                mb.Append("⏳ <i>").Append(Notifier.Esc(Strings.T(L, "movie_waiting_new"))).Append("</i>");
+            }
+            else if (!string.IsNullOrEmpty(s.seen_voices))
+            {
+                mb.Append("✅ <i>").Append(Notifier.Esc(Strings.T(L, "movie_list_available"))).Append("</i>");
+                mb.Append("\n⏳ <i>").Append(Notifier.Esc(Strings.T(L, "movie_waiting_new"))).Append("</i>");
+            }
+            else
+            {
+                mb.Append("🟡 <i>").Append(Notifier.Esc(Strings.T(L, "movie_list_waiting"))).Append("</i>");
+            }
+
+            mb.Append("</blockquote>");
+            return mb.ToString();
+        }
+
         var voiceAny = Strings.T(L, "list_voice_any");
         var voice = string.IsNullOrEmpty(s.voice) ? voiceAny : s.voice;
         var seasonNum = s.target_season > 0 ? s.target_season : s.last_season;

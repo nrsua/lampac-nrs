@@ -80,7 +80,12 @@ public sealed class EpisodeChecker : BackgroundService
             return 0;
         }
 
+        var movieSubs = subs
+            .Where(s => string.Equals(s.media_type, "movie", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
         var grouped = subs
+            .Where(s => !string.Equals(s.media_type, "movie", StringComparison.OrdinalIgnoreCase))
             .Select(s => new { sub = s, lang = chatLang.TryGetValue(s.chat_id, out var l) ? l : Strings.DefaultLang })
             .GroupBy(x => new { x.sub.tmdb_id, x.lang })
             .ToList();
@@ -263,6 +268,73 @@ public sealed class EpisodeChecker : BackgroundService
                         sb.Append($" -> {inner.GetType().Name}: {inner.Message}");
                     Console.WriteLine(sb.ToString());
                 }
+            }
+        }
+
+        foreach (var sub in movieSubs)
+        {
+            if (ct.IsCancellationRequested) break;
+            try
+            {
+                var lang = chatLang.TryGetValue(sub.chat_id, out var ml) ? ml : Strings.DefaultLang;
+                var movie = await TmdbClient.GetMovieAsync(sub.tmdb_id, lang, ct);
+
+                var sp = new ShowParams
+                {
+                    tmdb_id = sub.tmdb_id,
+                    title = !string.IsNullOrWhiteSpace(movie?.name) ? movie.name : sub.title,
+                    original_title = movie?.original_name ?? "",
+                    original_language = movie?.original_language ?? "",
+                    imdb_id = movie?.imdb_id ?? "",
+                    year = movie?.first_air_year ?? 0
+                };
+
+                var token = chatToken.TryGetValue(sub.chat_id, out var mtk) ? mtk : "";
+                var auth = new AuthQs { token = token, account_email = token, uid = token };
+
+                var balancers = await BalancerProbe.GetAvailableAsync(sp, auth, ct, movie: true);
+                if (!string.IsNullOrEmpty(sub.balancer))
+                    balancers = balancers.Where(b => string.Equals(b.balanser, sub.balancer, StringComparison.OrdinalIgnoreCase)).ToList();
+
+                var seen = new HashSet<string>(
+                    (sub.seen_voices ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries),
+                    StringComparer.OrdinalIgnoreCase);
+                var newItems = new List<(string balancer, string voice)>();
+
+                foreach (var b in balancers)
+                {
+                    if (ct.IsCancellationRequested) break;
+
+                    var probed = await BalancerProbe.ProbeMovieAsync(b, sp, auth, ct);
+                    if (probed.available)
+                    {
+                        var vlist = probed.voices.Count > 0 ? probed.voices : new List<string> { "" };
+                        foreach (var voice in vlist)
+                        {
+                            var key = b.balanser + "\t" + voice;
+                            if (seen.Add(key)) newItems.Add((b.balanser, voice));
+                        }
+                    }
+                    if (throttle > TimeSpan.Zero) await Task.Delay(throttle, ct);
+                }
+
+                if (newItems.Count > 0)
+                {
+                    if (await Notifier.SendMovieAvailableAsync(sub, newItems, lang, ct))
+                        notified++;
+                    sub.seen_voices = string.Join("\n", seen);
+                }
+
+                sub.last_checked_at = now;
+                sub.next_check_at = now + TimeSpan.FromMinutes(Math.Max(5, ModInit.conf.check_interval_minutes));
+
+                using var db = SqlContext.Create();
+                db.subs.Update(sub);
+                await db.SaveChangesAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EpWatch] movie sub {sub.tmdb_id}/{sub.chat_id} error: {ex.Message}");
             }
         }
 
