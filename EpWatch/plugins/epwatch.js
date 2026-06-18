@@ -61,7 +61,10 @@
         epwatch_movie_pick:            { uk: 'Оберіть балансир',                en: 'Pick a balancer',                     ru: 'Выберите балансер' },
         epwatch_movie_no_balancers:    { uk: 'Балансири недоступні',            en: 'No balancers available',              ru: 'Балансиры недоступны' },
         epwatch_movie_subscribed:      { uk: '🎬 Підписку на фільм оформлено',  en: '🎬 Subscribed to movie',             ru: '🎬 Подписка на фильм оформлена' },
-        epwatch_movie_any_balancer:    { uk: 'будь-який балансир',              en: 'any balancer',                        ru: 'любой балансер' }
+        epwatch_movie_any_balancer:    { uk: 'будь-який балансир',              en: 'any balancer',                        ru: 'любой балансер' },
+        epwatch_movie_any:             { uk: '🔔 Будь-який балансир',           en: '🔔 Any balancer',                    ru: '🔔 Любой балансер' },
+        epwatch_movie_any_sub:         { uk: 'Коли фільм з’явиться на будь-якому балансирі', en: 'When the movie appears on any balancer', ru: 'Когда фильм появится на любом балансере' },
+        epwatch_movie_list:            { uk: 'Доступно на балансирах:',         en: 'Available on balancers:',             ru: 'Доступно на балансерах:' }
     };
 
     function token() {
@@ -499,12 +502,17 @@
             if (status && status.subscribed)
                 items.push({ title: L('epwatch_unsub'), unsubscribe: true });
 
+            items.push({
+                title:    L('epwatch_movie_any'),
+                subtitle: L('epwatch_movie_any_sub'),
+                balancer: ''
+            });
+
             if (r && r.balancers && r.balancers.length) {
+                items.push({ title: L('epwatch_movie_list'), separator: true });
                 r.balancers.forEach(function (b) {
                     items.push({ title: '🌐 ' + (b.name || b.balancer), balancer: b.balancer });
                 });
-            } else {
-                items.push({ title: L('epwatch_movie_no_balancers'), empty: true });
             }
 
             Lampa.Select.show({
@@ -512,7 +520,6 @@
                 items: items,
                 onSelect: function (a) {
                     Lampa.Controller.toggle('content');
-                    if (a.empty) return;
                     if (a.unsubscribe) return doUnsub(card, $btn, null, onChanged);
                     doMovieSub(card, a.balancer, $btn, onChanged);
                 },
@@ -521,7 +528,23 @@
         },
         function () {
             Lampa.Loading.stop();
-            Lampa.Noty.show(L('epwatch_err_network'));
+            var items = [{
+                title:    L('epwatch_movie_any'),
+                subtitle: L('epwatch_movie_any_sub'),
+                balancer: ''
+            }];
+            if (status && status.subscribed)
+                items.unshift({ title: L('epwatch_unsub'), unsubscribe: true });
+            Lampa.Select.show({
+                title: L('epwatch_movie_pick') + ' [BETA]',
+                items: items,
+                onSelect: function (a) {
+                    Lampa.Controller.toggle('content');
+                    if (a.unsubscribe) return doUnsub(card, $btn, null, onChanged);
+                    doMovieSub(card, a.balancer, $btn, onChanged);
+                },
+                onBack: function () { Lampa.Controller.toggle('content'); }
+            });
         }, 60000);
     }
 
