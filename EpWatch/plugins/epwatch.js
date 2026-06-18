@@ -155,6 +155,60 @@
         return 'https://image.tmdb.org/t/p/w300' + path;
     }
 
+    function cardFallback(sub) {
+        var card = {
+            id:          sub.tmdb_id,
+            tmdb_id:     sub.tmdb_id,
+            poster_path: sub.poster_path || '',
+            source:      'tmdb',
+            epwatch:     sub
+        };
+        if (sub.media_type === 'movie') {
+            card.title          = sub.title;
+            card.original_title = sub.title;
+        } else {
+            card.name              = sub.title;
+            card.original_name     = sub.title;
+            card.number_of_seasons = sub.last_season || 1;
+        }
+        return card;
+    }
+
+    function buildCards(self, subs) {
+        var results = new Array(subs.length);
+        var pending = subs.length;
+        var lang = '';
+        try { lang = Lampa.Storage.get('tmdb_lang', ''); } catch (e) {}
+
+        function done() {
+            if (--pending > 0) return;
+            self.build({ results: results, total_pages: 1, card_category: true });
+            self.render().find('.category-full').addClass('mapping--grid').addClass('cols--6');
+        }
+
+        subs.forEach(function (sub, i) {
+            var path = (sub.media_type === 'movie' ? 'movie/' : 'tv/') + sub.tmdb_id +
+                       '?api_key=' + Lampa.TMDB.key() +
+                       (lang ? '&language=' + encodeURIComponent(lang) : '');
+            var rq = new Lampa.Reguest();
+            rq.timeout(8000);
+            rq.silent(Lampa.TMDB.api(path), function (data) {
+                if (data && data.id) {
+                    data.source = 'tmdb';
+                    if (!data.poster_path && sub.poster_path) data.poster_path = sub.poster_path;
+                    data.epwatch = sub;
+                    results[i] = data;
+                } else {
+                    results[i] = cardFallback(sub);
+                }
+                done();
+            }, function () {
+                results[i] = cardFallback(sub);
+                done();
+            });
+        });
+    }
+
     function SubsComponent(object) {
         var comp = new Lampa.InteractionCategory(object);
         var anyWord = L('epwatch_voice_any_word');
@@ -166,28 +220,7 @@
             get(api('/epwatch/subscriptions'), function (r) {
                 if (!r || !r.linked) return promptLink(self);
                 if (!r.results || !r.results.length) return self.empty();
-
-                var results = r.results.map(function (sub) {
-                    return {
-                        id:                sub.tmdb_id,
-                        tmdb_id:           sub.tmdb_id,
-                        name:              sub.title,
-                        title:             sub.title,
-                        original_name:     sub.title,
-                        original_title:    sub.title,
-                        poster_path:       sub.poster_path || '',
-                        backdrop_path:     '',
-                        first_air_date:    '',
-                        release_date:      '',
-                        vote_average:      0,
-                        number_of_seasons: sub.last_season || 1,
-                        source:            'tmdb',
-                        epwatch:     sub
-                    };
-                });
-
-                self.build({ results: results, total_pages: 1, card_category: true });
-                self.render().find('.category-full').addClass('mapping--grid').addClass('cols--6');
+                buildCards(self, r.results);
             }, function () { self.empty(); });
         };
 
