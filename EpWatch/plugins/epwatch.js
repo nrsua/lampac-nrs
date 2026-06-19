@@ -118,9 +118,9 @@
         n['native'](url, ok, err || function () { });
     }
 
-    function post(url, body, ok, err) {
+    function post(url, body, ok, err, timeout) {
         var n = new Lampa.Reguest();
-        n.timeout(15000);
+        n.timeout(timeout || 15000);
         n['native'](url, ok, err || function () { },
             JSON.stringify(body || {}),
             { dataType: 'json', contentType: 'application/json' });
@@ -189,21 +189,30 @@
     function buildCards(self, subs) {
         var results = new Array(subs.length);
         var pending = subs.length;
+        var built = false;
         var lang = '';
         try { lang = Lampa.Storage.get('tmdb_lang', ''); } catch (e) {}
 
-        function done() {
-            if (--pending > 0) return;
+        function finish() {
+            if (built) return;
+            built = true;
+            clearTimeout(deadline);
+            for (var k = 0; k < subs.length; k++)
+                if (!results[k]) results[k] = cardFallback(subs[k]);
             self.build({ results: results, total_pages: 1, card_category: true });
             self.render().find('.category-full').addClass('mapping--grid').addClass('cols--6');
         }
+
+        function done() { if (--pending <= 0) finish(); }
+
+        var deadline = setTimeout(finish, 4000);
 
         subs.forEach(function (sub, i) {
             var path = (sub.media_type === 'movie' ? 'movie/' : 'tv/') + sub.tmdb_id +
                        '?api_key=' + Lampa.TMDB.key() +
                        (lang ? '&language=' + encodeURIComponent(lang) : '');
             var rq = new Lampa.Reguest();
-            rq.timeout(8000);
+            rq.timeout(6000);
             rq.silent(Lampa.TMDB.api(path), function (data) {
                 if (data && data.id) {
                     data.source = 'tmdb';
@@ -245,7 +254,7 @@
 
             if (isMovie) {
                 position = '🎬 ' + (sub.seen_voices ? '✅' : '⏳');
-                voiceLine = sub.balancer || L('epwatch_movie_any_balancer');
+                voiceLine = sub.balancer_name || sub.balancer || L('epwatch_movie_any_balancer');
             } else {
                 var voice = sub.voice || anyWord;
                 var srcTag = sub.structure_source === 'tvdb' ? ' · TVDB'
@@ -506,7 +515,9 @@
             voice_episode: 0,
             target_season: targetSeason || 0
         };
+        Lampa.Loading.start(function () { Lampa.Loading.stop(); });
         post(api('/epwatch/subscribe'), payload, function (r) {
+            Lampa.Loading.stop();
             if (r && r.success) {
                 Lampa.Noty.show(voice ? (L('epwatch_subscribed_v') + voice) : L('epwatch_subscribed'));
                 $btn.addClass('active').find('path').attr('fill', 'currentColor');
@@ -515,7 +526,7 @@
                 Lampa.Controller.toggle('content');
             });
             else Lampa.Noty.show(L('epwatch_err_unknown') + ': ' + ((r && r.msg) || ''));
-        }, function () { Lampa.Noty.show(L('epwatch_err_network')); });
+        }, function () { Lampa.Loading.stop(); Lampa.Noty.show(L('epwatch_err_network')); }, 90000);
     }
 
     function doUnsub(card, $btn, voice, onChanged) {
@@ -601,14 +612,16 @@
             balancer:    balancer || '',
             poster_path: card.poster_path || ''
         };
+        Lampa.Loading.start(function () { Lampa.Loading.stop(); });
         post(api('/epwatch/subscribe'), payload, function (r) {
+            Lampa.Loading.stop();
             if (r && r.success) {
                 Lampa.Noty.show(L('epwatch_movie_subscribed'));
                 $btn.addClass('active').find('path').attr('fill', 'currentColor');
                 if (typeof onChanged === 'function') onChanged();
             } else if (r && r.msg === 'not_linked') showLink(function () { Lampa.Controller.toggle('content'); });
             else Lampa.Noty.show(L('epwatch_err_unknown') + ': ' + ((r && r.msg) || ''));
-        }, function () { Lampa.Noty.show(L('epwatch_err_network')); });
+        }, function () { Lampa.Loading.stop(); Lampa.Noty.show(L('epwatch_err_network')); }, 90000);
     }
 
     function openExternal(link) {

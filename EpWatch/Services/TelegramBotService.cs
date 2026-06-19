@@ -341,14 +341,12 @@ public sealed class TelegramBotService : BackgroundService
 
     public static string FormatSubscriptionBlock(SubscriptionRow s, string L)
     {
-        var idtag = Notifier.IdTag(s.media_type, s.tmdb_id);
-
         if (string.Equals(s.media_type, "movie", StringComparison.OrdinalIgnoreCase))
         {
             var mb = new StringBuilder();
             mb.Append("<blockquote>");
             mb.Append("🎬 <b>").Append(Notifier.Esc(s.title)).Append("</b>\n");
-            var bal = string.IsNullOrEmpty(s.balancer) ? Strings.T(L, "movie_any_balancer") : s.balancer;
+            var bal = string.IsNullOrEmpty(s.balancer) ? Strings.T(L, "movie_any_balancer") : BalancerProbe.DisplayName(s.balancer);
             mb.Append("🌐 ").Append(Notifier.Esc(bal)).Append('\n');
 
             var voices = ParseSeenVoices(s.seen_voices);
@@ -367,8 +365,6 @@ public sealed class TelegramBotService : BackgroundService
             {
                 mb.Append("🟡 <i>").Append(Notifier.Esc(Strings.T(L, "movie_list_waiting"))).Append("</i>");
             }
-
-            if (idtag.Length > 0) mb.Append('\n').Append(idtag);
 
             mb.Append("</blockquote>");
             return mb.ToString();
@@ -440,8 +436,6 @@ public sealed class TelegramBotService : BackgroundService
             if (s.next_air_date.HasValue)
                 sb.Append(' ').Append(s.next_air_date.Value.ToString("yyyy-MM-dd"));
         }
-
-        if (idtag.Length > 0) sb.Append('\n').Append(idtag);
 
         sb.Append("</blockquote>");
         return sb.ToString();

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -18,6 +19,20 @@ public static class BalancerProbe
 
     static volatile int _detectedPort;
     static volatile string _detectedHost;
+
+    static readonly ConcurrentDictionary<string, string> _balancerNames = new(StringComparer.OrdinalIgnoreCase);
+
+    static void RememberName(string balanser, string name)
+    {
+        if (!string.IsNullOrWhiteSpace(balanser) && !string.IsNullOrWhiteSpace(name))
+            _balancerNames[balanser] = name;
+    }
+
+    public static string DisplayName(string balanser)
+    {
+        if (string.IsNullOrWhiteSpace(balanser)) return balanser;
+        return _balancerNames.TryGetValue(balanser, out var n) && !string.IsNullOrWhiteSpace(n) ? n : balanser;
+    }
 
     public static void RememberLocal(string host, int port)
     {
@@ -117,10 +132,14 @@ public static class BalancerProbe
                 if (u.Contains("{localhost}"))
                     u = u.Replace("{localhost}", HostBase());
 
+                var bname = e.Value<string>("name") ?? "";
+                var balanser = e.Value<string>("balanser") ?? e.Value<string>("plugin") ?? GuessBalancer(u);
+                RememberName(balanser, bname);
+
                 list.Add(new BalancerEntry
                 {
-                    name = e.Value<string>("name") ?? "",
-                    balanser = e.Value<string>("balanser") ?? e.Value<string>("plugin") ?? GuessBalancer(u),
+                    name = bname,
+                    balanser = balanser,
                     url = u
                 });
             }

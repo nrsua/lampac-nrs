@@ -514,12 +514,15 @@ public class ApiController : BaseController
             if (!string.IsNullOrEmpty(data.balancer))
                 balancers = balancers.Where(b => string.Equals(b.balanser, data.balancer, StringComparison.OrdinalIgnoreCase)).ToList();
 
-            foreach (var b in balancers)
+            var probeTasks = balancers
+                .Select(b => BalancerProbe.ProbeMovieAsync(b, sp, auth, HttpContext.RequestAborted))
+                .ToArray();
+            var probedAll = await Task.WhenAll(probeTasks);
+            for (int i = 0; i < balancers.Count; i++)
             {
-                var probed = await BalancerProbe.ProbeMovieAsync(b, sp, auth, HttpContext.RequestAborted);
-                if (!probed.available) continue;
-                var vlist = probed.voices.Count > 0 ? probed.voices : new System.Collections.Generic.List<string> { "" };
-                foreach (var v in vlist) seen.Add(b.balanser + "\t" + v);
+                if (!probedAll[i].available) continue;
+                var vlist = probedAll[i].voices.Count > 0 ? probedAll[i].voices : new System.Collections.Generic.List<string> { "" };
+                foreach (var v in vlist) seen.Add(balancers[i].balanser + "\t" + v);
             }
             Console.WriteLine($"[EpWatch] /subscribe movie baseline: {seen.Count} voices already present");
         }
@@ -569,7 +572,7 @@ public class ApiController : BaseController
 
         if (Notifier.Ready)
         {
-            var balName = string.IsNullOrEmpty(data.balancer) ? Strings.T(L, "movie_any_balancer") : data.balancer;
+            var balName = string.IsNullOrEmpty(data.balancer) ? Strings.T(L, "movie_any_balancer") : BalancerProbe.DisplayName(data.balancer);
             _ = Notifier.SendTextAsync(user.chat_id, Strings.T(L, "movie_sub_added", Notifier.Esc(title), Notifier.Esc(balName)), HttpContext.RequestAborted);
         }
 
@@ -646,31 +649,33 @@ public class ApiController : BaseController
         if (user == null)
             return Json(new { success = true, linked = false, results = new object[0] });
 
-        var list = await db.subs.AsNoTracking()
+        var rows = await db.subs.AsNoTracking()
             .Where(s => s.chat_id == user.chat_id)
             .OrderByDescending(s => s.subscribed_at)
-            .Select(s => new
-            {
-                id = s.Id,
-                tmdb_id = s.tmdb_id,
-                title = s.title,
-                voice = s.voice,
-                balancer = s.balancer,
-                poster_path = s.poster_path,
-                last_season = s.last_season,
-                last_episode = s.last_episode,
-                last_voice_episode = s.last_voice_episode,
-                season_total = s.season_total,
-                season_aired = s.season_aired,
-                target_season = s.target_season,
-                show_status = s.show_status,
-                structure_source = s.structure_source,
-                media_type = s.media_type,
-                seen_voices = s.seen_voices,
-                last_checked_at = s.last_checked_at,
-                subscribed_at = s.subscribed_at
-            })
-            .ToArrayAsync();
+            .ToListAsync();
+
+        var list = rows.Select(s => new
+        {
+            id = s.Id,
+            tmdb_id = s.tmdb_id,
+            title = s.title,
+            voice = s.voice,
+            balancer = s.balancer,
+            balancer_name = BalancerProbe.DisplayName(s.balancer),
+            poster_path = s.poster_path,
+            last_season = s.last_season,
+            last_episode = s.last_episode,
+            last_voice_episode = s.last_voice_episode,
+            season_total = s.season_total,
+            season_aired = s.season_aired,
+            target_season = s.target_season,
+            show_status = s.show_status,
+            structure_source = s.structure_source,
+            media_type = s.media_type,
+            seen_voices = s.seen_voices,
+            last_checked_at = s.last_checked_at,
+            subscribed_at = s.subscribed_at
+        }).ToArray();
 
         return Json(new { success = true, linked = true, results = list });
     }

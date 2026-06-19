@@ -73,7 +73,7 @@ public static class Notifier
 
         foreach (var g in items.GroupBy(i => i.balancer))
         {
-            sb.Append("\n🌐 ").Append(Esc(g.Key));
+            sb.Append("\n🌐 ").Append(Esc(BalancerProbe.DisplayName(g.Key)));
             foreach (var voice in g.Select(x => x.voice).Where(v => !string.IsNullOrEmpty(v)).Distinct())
                 sb.Append("\n   🎙 ").Append(Esc(voice));
         }
