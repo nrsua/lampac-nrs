@@ -272,31 +272,39 @@ public static class BalancerProbe
                     {
                         Console.WriteLine($"[EpWatch] probe {entry.balanser} s={pick} keys: [{string.Join(",", second.Properties().Select(p => p.Name))}]");
                         CollectVoices(second, voices, entry.balanser);
-                        maxEp = CollectMaxEpisode(second, voiceName);
 
-                        if (!string.IsNullOrEmpty(voiceName))
+                        if (pick == desiredSeason || desiredSeason < 0)
                         {
-                            var vinfo = FindVoice(second, voiceName);
-                            if (vinfo.found)
+                            maxEp = CollectMaxEpisode(second, voiceName);
+
+                            if (!string.IsNullOrEmpty(voiceName))
                             {
-                                if (vinfo.active || vinfo.token.Length == 0)
+                                var vinfo = FindVoice(second, voiceName);
+                                if (vinfo.found)
                                 {
-                                    var voiceMax = CollectMaxEpisode(second, null);
-                                    if (voiceMax > maxEp) maxEp = voiceMax;
-                                }
-                                else
-                                {
-                                    var byVoiceUrl = AppendQs(followUrl, "t=" + vinfo.token);
-                                    Console.WriteLine($"[EpWatch] probe {entry.balanser} voice url: {byVoiceUrl}");
-                                    var byVoice = await FetchByUrlAsync(byVoiceUrl, auth, timeoutSec, ct);
-                                    if (byVoice != null)
+                                    if (vinfo.active || vinfo.token.Length == 0)
                                     {
-                                        Console.WriteLine($"[EpWatch] probe {entry.balanser} t={vinfo.token} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
-                                        var voiceMax = CollectMaxEpisode(byVoice, null);
+                                        var voiceMax = CollectMaxEpisode(second, null);
                                         if (voiceMax > maxEp) maxEp = voiceMax;
+                                    }
+                                    else
+                                    {
+                                        var byVoiceUrl = AppendQs(followUrl, "t=" + vinfo.token);
+                                        Console.WriteLine($"[EpWatch] probe {entry.balanser} voice url: {byVoiceUrl}");
+                                        var byVoice = await FetchByUrlAsync(byVoiceUrl, auth, timeoutSec, ct);
+                                        if (byVoice != null)
+                                        {
+                                            Console.WriteLine($"[EpWatch] probe {entry.balanser} t={vinfo.token} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
+                                            var voiceMax = CollectMaxEpisode(byVoice, null);
+                                            if (voiceMax > maxEp) maxEp = voiceMax;
+                                        }
                                     }
                                 }
                             }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[EpWatch] probe {entry.balanser} requested s={desiredSeason} not in tree [{string.Join(",", tree.Keys)}]; not counting s={pick} episodes");
                         }
                     }
                 }

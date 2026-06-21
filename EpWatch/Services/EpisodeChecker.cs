@@ -211,6 +211,12 @@ public sealed class EpisodeChecker : BackgroundService
                             if (throttle > TimeSpan.Zero) await Task.Delay(throttle, ct);
                         }
 
+                        if (newMax > sub.last_episode)
+                        {
+                            Console.WriteLine($"[EpWatch] voice cap {sub.tmdb_id}/{sub.chat_id} s={effectiveSeason}: balancer={newMax} > tmdb_aired={sub.last_episode}, capping");
+                            newMax = sub.last_episode;
+                        }
+
                         if (newMax > sub.last_voice_episode)
                         {
                             for (int e = sub.last_voice_episode + 1; e <= newMax; e++)
