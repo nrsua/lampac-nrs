@@ -43,8 +43,9 @@
         epwatch_settings_link:         { uk: 'Прив’язати Telegram',             en: 'Link Telegram',                       ru: 'Привязать Telegram' },
         epwatch_settings_lang_auto:    { uk: 'Авто',                            en: 'Auto',                                ru: 'Авто' },
         epwatch_link_qr_hint:          { uk: 'Скануйте QR або відкрийте бота',  en: 'Scan the QR or open the bot',         ru: 'Сканируйте QR или откройте бота' },
-        epwatch_link_manual:           { uk: 'Бот уже запускався? Натисніть «Вже писав боту» і просто надішліть готове повідомлення.', en: 'Bot already started? Tap "Already used the bot" and just send the prepared message.', ru: 'Бот уже запускался? Нажмите «Уже писал боту» и просто отправьте готовое сообщение.' },
-        epwatch_link_open_text:        { uk: 'Вже писав боту', en: 'Already used the bot', ru: 'Уже писал боту' },
+        epwatch_link_manual:           { uk: 'Вже прив’язували цього бота чи писали йому повідомлення? Натисніть «Переприв’язати».', en: 'Already linked this bot or messaged it before? Tap "Re-link".', ru: 'Уже привязывали этого бота или писали ему? Нажмите «Перепривязать».' },
+        epwatch_link_scan:             { uk: 'Відскануйте QR або напишіть повідомлення боту:', en: 'Scan the QR or send a message to the bot:', ru: 'Отсканируйте QR или напишите сообщение боту:' },
+        epwatch_link_open_text:        { uk: 'Переприв’язати', en: 'Re-link', ru: 'Перепривязать' },
         epwatch_linked:                { uk: 'Telegram-бот прив’язаний',        en: 'Telegram bot linked',                 ru: 'Telegram-бот привязан' },
         epwatch_close:                 { uk: 'Закрити',                         en: 'Close',                               ru: 'Закрыть' },
         epwatch_settings_unlink:       { uk: 'Відв’язати Telegram',             en: 'Unlink Telegram',                     ru: 'Отвязать Telegram' },
@@ -643,12 +644,15 @@
         if (document.getElementById('epwatch-styles')) return;
         var css =
             '.epwatch-link{text-align:center}' +
-            '.epwatch-link__qr{display:inline-block;background:#fff;padding:0.8em;border-radius:0.7em;margin-bottom:1em}' +
-            '.epwatch-link__qr img{display:block;width:16em;height:16em}' +
+            '.epwatch-link{max-height:88vh;overflow:auto}' +
+            '.epwatch-link__qr{display:inline-block;background:#fff;padding:0.6em;border-radius:0.7em;margin-bottom:0.7em}' +
+            '.epwatch-link__qr img{display:block;width:min(14em,38vh);height:min(14em,38vh)}' +
             '.epwatch-link__bot{font-size:1.4em;font-weight:600;margin-bottom:0.3em}' +
             '.epwatch-link__hint{opacity:0.6;font-size:1em;margin-bottom:0.8em}' +
             '.epwatch-link__url{font-size:0.85em;opacity:0.5;word-break:break-all;max-width:30em;margin:0 auto;line-height:1.4}' +
             '.epwatch-link__manual{font-size:0.85em;opacity:0.7;max-width:30em;margin:0.8em auto 0;line-height:1.4}' +
+            '.epwatch-link__scan{font-size:0.95em;opacity:0.85;max-width:30em;margin:0.8em auto 0.2em;line-height:1.4}' +
+            '.epwatch-link__code{display:inline-block;margin:0.5em auto 0;padding:0.45em 0.9em;background:rgba(255,255,255,0.12);border-radius:0.4em;font-size:1.05em;font-weight:600;word-break:break-all;max-width:30em;line-height:1.5}' +
             '.card__subscribe{font-size:0.85em}' +
             '.card__subscribe-tmdb{display:block;font-size:0.72em;opacity:0.55;margin-top:0.15em;line-height:1.1;letter-spacing:0.02em}';
         var style = document.createElement('style');
@@ -661,6 +665,9 @@
         injectStyles();
         var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=' + encodeURIComponent(link);
         var botName = bot ? '@' + bot : '';
+        var code = '';
+        try { code = decodeURIComponent((link.match(/[?&](?:start|text)=([^&]+)/) || [])[1] || ''); }
+        catch (e) { code = (link.match(/[?&](?:start|text)=([^&]+)/) || [])[1] || ''; }
 
         var body = $(
             '<div class="epwatch-link">' +
@@ -669,10 +676,13 @@
                 '<div class="epwatch-link__hint">' + L('epwatch_link_qr_hint') + '</div>' +
                 '<div class="epwatch-link__url">' + link + '</div>' +
                 '<div class="epwatch-link__manual">' + L('epwatch_link_manual') + '</div>' +
+                '<div class="epwatch-link__scan" style="display:none">' + L('epwatch_link_scan') + '</div>' +
+                (code ? '<div class="epwatch-link__code" style="display:none">' + code + '</div>' : '') +
             '</div>'
         );
 
         var textLink = link.indexOf('?start=') >= 0 ? link.replace('?start=', '?text=') : link;
+        var textQr = 'https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=10&data=' + encodeURIComponent(textLink);
 
         var footer = $(
             '<div class="modal__footer">' +
@@ -700,8 +710,14 @@
             if (typeof onClose === 'function') onClose();
         };
 
-        footer.find('.epwatch-link__open').on('hover:enter', function () { openExternal(link); });
-        footer.find('.epwatch-link__text').on('hover:enter', function () { openExternal(textLink); });
+        var currentLink = link;
+        footer.find('.epwatch-link__open').on('hover:enter', function () { openExternal(currentLink); });
+        footer.find('.epwatch-link__text').on('hover:enter', function () {
+            body.find('.epwatch-link__qr img').attr('src', textQr);
+            currentLink = textLink;
+            body.find('.epwatch-link__hint, .epwatch-link__url, .epwatch-link__manual').css('display', 'none');
+            body.find('.epwatch-link__scan, .epwatch-link__code').css('display', '');
+        });
         footer.find('.epwatch-link__close').on('hover:enter', function () { closeAndCallback(); });
 
         Lampa.Modal.open({
