@@ -269,7 +269,8 @@
                     position = 'S' + seasonNum + ' E' + (hasVoice ? (sub.last_voice_episode || 0) : sub.last_episode);
                 if (hasVoice && sub.season_total && sub.season_total > 0 && tmdbAired > shownAired)
                     tmdbHint = '<span class="card__subscribe-tmdb">' + L('epwatch_tmdb_short') + ' ' + tmdbAired + '/' + sub.season_total + '</span>';
-                voiceLine = voice + srcTag;
+                var balTag = (hasVoice && (sub.balancer_name || sub.balancer)) ? '<br>🌐 ' + (sub.balancer_name || sub.balancer) : '';
+                voiceLine = '🎙 ' + voice + srcTag + balTag;
             }
 
             try {
@@ -645,6 +646,7 @@
             '.epwatch-link__bot{font-size:1.4em;font-weight:600;margin-bottom:0.3em}' +
             '.epwatch-link__hint{opacity:0.6;font-size:1em;margin-bottom:0.8em}' +
             '.epwatch-link__url{font-size:0.85em;opacity:0.5;word-break:break-all;max-width:30em;margin:0 auto;line-height:1.4}' +
+            '.card__subscribe{font-size:0.85em}' +
             '.card__subscribe-tmdb{display:block;font-size:0.72em;opacity:0.55;margin-top:0.15em;line-height:1.1;letter-spacing:0.02em}';
         var style = document.createElement('style');
         style.id = 'epwatch-styles';

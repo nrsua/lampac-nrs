@@ -396,7 +396,12 @@ public sealed class EpisodeChecker : BackgroundService
 
         var line = $"🆕 <b>{Notifier.Esc(sub.title)}</b> · {Notifier.FormatSE(ep.season, ep.episode)}";
         if (!string.IsNullOrEmpty(ep.name)) line += $" - <i>{Notifier.Esc(ep.name)}</i>";
-        if (!string.IsNullOrEmpty(sub.voice)) line += $"\n   🎙 {Notifier.Esc(sub.voice)}";
+        if (!string.IsNullOrEmpty(sub.voice))
+        {
+            line += $"\n   🎙 {Notifier.Esc(sub.voice)}";
+            if (!string.IsNullOrEmpty(sub.balancer))
+                line += $"\n   🌐 {Notifier.Esc(BalancerProbe.DisplayName(sub.balancer))}";
+        }
         lines.Add(line);
     }
 

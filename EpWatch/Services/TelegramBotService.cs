@@ -387,6 +387,8 @@ public sealed class TelegramBotService : BackgroundService
         else if (string.Equals(s.structure_source, StructureResolver.ABSOLUTE, StringComparison.OrdinalIgnoreCase))
             sb.Append(" · <code>ABS</code>");
         sb.Append('\n');
+        if (hasVoice && !string.IsNullOrEmpty(s.balancer))
+            sb.Append("🌐 ").Append(Notifier.Esc(BalancerProbe.DisplayName(s.balancer))).Append('\n');
 
         sb.Append("📺 <b>S").Append(seasonNum.ToString("D2")).Append("</b>");
 

@@ -31,7 +31,11 @@ public static class Notifier
         sb.Append('\n');
 
         if (!string.IsNullOrEmpty(sub.voice))
+        {
             sb.Append("🎙 ").Append(Esc(sub.voice)).Append('\n');
+            if (!string.IsNullOrEmpty(sub.balancer))
+                sb.Append("🌐 ").Append(Esc(BalancerProbe.DisplayName(sub.balancer))).Append('\n');
+        }
         if (ep.air_date.HasValue)
             sb.Append("📅 ").Append(ep.air_date.Value.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture)).Append('\n');
 
