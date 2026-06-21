@@ -41,13 +41,13 @@ public class ModInit : IModuleLoaded, IModuleConfigure
 
         if (conf.enable && string.IsNullOrWhiteSpace(conf.bot_token))
         {
-            Console.WriteLine("\n\t[EpWatch] bot_token is not set; notifications are disabled.");
-            Console.WriteLine("\t            Add a EpWatch section with bot_token to init.conf to enable.\n");
+            Log.Info("\n\t[EpWatch] bot_token is not set; notifications are disabled.");
+            Log.Info("\t            Add a EpWatch section with bot_token to init.conf to enable.\n");
         }
         else if (conf.enable)
         {
             var keyTail = string.IsNullOrEmpty(conf.tmdb_api_key) ? "(empty)" : conf.tmdb_api_key.Substring(0, Math.Min(8, conf.tmdb_api_key.Length)) + "…";
-            Console.WriteLine($"\n\t[EpWatch] loaded - check interval: {conf.check_interval_minutes} min, tmdb_api_key: {keyTail}, tmdb_lang: {conf.tmdb_lang}\n");
+            Log.Info($"\n\t[EpWatch] loaded - check interval: {conf.check_interval_minutes} min, tmdb_api_key: {keyTail}, tmdb_lang: {conf.tmdb_lang}, debug: {conf.debug}\n");
         }
     }
 
@@ -80,7 +80,7 @@ public class ModInit : IModuleLoaded, IModuleConfigure
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] middleware hook skipped: {ex.Message}");
+            Log.Warn($"[EpWatch] middleware hook skipped: {ex.Message}");
         }
     }
 

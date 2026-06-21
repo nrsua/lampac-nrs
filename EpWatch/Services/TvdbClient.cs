@@ -58,7 +58,7 @@ public static class TvdbClient
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] tvdb imdb={imdbId} failed: {ex.Message}");
+            Log.Dbg($"[EpWatch] tvdb imdb={imdbId} failed: {ex.Message}");
             return null;
         }
     }
@@ -138,7 +138,7 @@ public static class TvdbClient
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] tvdb show={tvdbId} failed: {ex.Message}");
+            Log.Dbg($"[EpWatch] tvdb show={tvdbId} failed: {ex.Message}");
             return null;
         }
     }

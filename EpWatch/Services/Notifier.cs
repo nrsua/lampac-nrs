@@ -59,7 +59,7 @@ public static class Notifier
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] notify failed: {ex.Message}");
+            Log.Warn($"[EpWatch] notify failed: {ex.Message}");
             return false;
         }
     }
@@ -101,7 +101,7 @@ public static class Notifier
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] batch notify failed: {ex.Message}");
+            Log.Warn($"[EpWatch] batch notify failed: {ex.Message}");
             return false;
         }
     }
@@ -140,7 +140,7 @@ public static class Notifier
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] movie notify failed: {ex.Message}");
+            Log.Warn($"[EpWatch] movie notify failed: {ex.Message}");
             return false;
         }
     }
@@ -155,7 +155,7 @@ public static class Notifier
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] send text failed: {ex.Message}");
+            Log.Warn($"[EpWatch] send text failed: {ex.Message}");
             return false;
         }
     }

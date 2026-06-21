@@ -29,19 +29,19 @@ public sealed class TelegramBotService : BackgroundService
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EpWatch] bot init failed: {ex.Message} - retry in {initRetry.TotalSeconds:F0}s");
+                Log.Warn($"[EpWatch] bot init failed: {ex.Message} - retry in {initRetry.TotalSeconds:F0}s");
             }
 
             if (me != null)
             {
                 Notifier.Bot = bot;
                 Notifier.BotUsername = me.Value<string>("username");
-                Console.WriteLine($"[EpWatch] @{Notifier.BotUsername} ready");
+                Log.Info($"[EpWatch] @{Notifier.BotUsername} ready");
                 break;
             }
 
             if (me == null)
-                Console.WriteLine($"[EpWatch] getMe returned empty - retry in {initRetry.TotalSeconds:F0}s");
+                Log.Warn($"[EpWatch] getMe returned empty - retry in {initRetry.TotalSeconds:F0}s");
 
             try { await Task.Delay(initRetry, ct); } catch { return; }
         }
@@ -68,7 +68,7 @@ public sealed class TelegramBotService : BackgroundService
             catch (Exception ex)
             {
                 var reason = ex is OperationCanceledException ? "timeout/no network" : ex.Message;
-                Console.WriteLine($"[EpWatch] getUpdates: {reason} - retry in {errDelay.TotalSeconds:F0}s");
+                Log.Warn($"[EpWatch] getUpdates: {reason} - retry in {errDelay.TotalSeconds:F0}s");
                 try { await Task.Delay(errDelay, ct); } catch { break; }
                 errDelay = TimeSpan.FromSeconds(Math.Min(maxErrDelay.TotalSeconds, errDelay.TotalSeconds * 2));
                 continue;
@@ -91,7 +91,7 @@ public sealed class TelegramBotService : BackgroundService
                     else if (cb != null)
                         await HandleCallback(bot, cb, ct);
                 }
-                catch (Exception ex) { Console.WriteLine($"[EpWatch] update: {ex.Message}"); }
+                catch (Exception ex) { Log.Warn($"[EpWatch] update: {ex.Message}"); }
             }
         }
 
@@ -185,7 +185,7 @@ public sealed class TelegramBotService : BackgroundService
             _ = Task.Run(async () =>
             {
                 try { await EpisodeChecker.CheckOnceAsync(chatId, CancellationToken.None); }
-                catch (Exception ex) { Console.WriteLine($"[EpWatch] /check: {ex.Message}"); }
+                catch (Exception ex) { Log.Warn($"[EpWatch] /check: {ex.Message}"); }
             });
         }
         else if (text == "/help" || text == Strings.T(L, "btn_help"))

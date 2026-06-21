@@ -31,4 +31,6 @@ public class ModuleConf
     public string id_format { get; set; } = "{type}|{id}";
 
     public bool push_open_button { get; set; } = false;
+
+    public bool debug { get; set; } = false;
 }

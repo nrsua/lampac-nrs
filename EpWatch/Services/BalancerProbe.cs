@@ -92,14 +92,14 @@ public static class BalancerProbe
             using var resp = await http.GetAsync(url, ct);
             if (!resp.IsSuccessStatusCode)
             {
-                Console.WriteLine($"[EpWatch] /lite/events HTTP {(int)resp.StatusCode}");
+                Log.Dbg($"[EpWatch] /lite/events HTTP {(int)resp.StatusCode}");
                 return list;
             }
 
             var raw = await resp.Content.ReadAsStringAsync(ct);
             if (string.IsNullOrWhiteSpace(raw) || raw == "[]")
             {
-                Console.WriteLine($"[EpWatch] /lite/events returned empty (raw={(raw ?? "null")}) url={url}");
+                Log.Dbg($"[EpWatch] /lite/events returned empty (raw={(raw ?? "null")}) url={Log.Url(url)}");
                 return list;
             }
 
@@ -108,14 +108,14 @@ public static class BalancerProbe
             catch
             {
                 var preview = raw.Length > 300 ? raw.Substring(0, 300) : raw;
-                Console.WriteLine($"[EpWatch] /lite/events non-JSON ({raw.Length} chars): {preview}");
+                Log.Dbg($"[EpWatch] /lite/events non-JSON ({raw.Length} chars): {preview}");
                 return list;
             }
 
             JArray online = jt as JArray ?? jt["online"] as JArray;
             if (online == null)
             {
-                Console.WriteLine($"[EpWatch] /lite/events unexpected shape, type={jt.Type}");
+                Log.Dbg($"[EpWatch] /lite/events unexpected shape, type={jt.Type}");
                 return list;
             }
 
@@ -145,11 +145,11 @@ public static class BalancerProbe
             }
 
             if (strCount > 0)
-                Console.WriteLine($"[EpWatch] /lite/events returned {strCount} string-codes (checkOnlineSearch mode), parsed objects={objCount}");
+                Log.Dbg($"[EpWatch] /lite/events returned {strCount} string-codes (checkOnlineSearch mode), parsed objects={objCount}");
 
-            Console.WriteLine($"[EpWatch] /lite/events tmdb={sp?.tmdb_id ?? 0} (auth={(auth?.IsEmpty ?? true ? "no" : "yes")}, imdb={(string.IsNullOrEmpty(sp?.imdb_id) ? "no" : "yes")}) -> {list.Count} balancers via {HostBase()}");
+            Log.Dbg($"[EpWatch] /lite/events tmdb={sp?.tmdb_id ?? 0} (auth={(auth?.IsEmpty ?? true ? "no" : "yes")}, imdb={(string.IsNullOrEmpty(sp?.imdb_id) ? "no" : "yes")}) -> {list.Count} balancers via {HostBase()}");
         }
-        catch (Exception ex) { Console.WriteLine($"[EpWatch] /lite/events failed: {ex.Message}"); }
+        catch (Exception ex) { Log.Dbg($"[EpWatch] /lite/events failed: {ex.Message}"); }
 
         var allowed = ModInit.conf.allowed_balancers;
         if (allowed != null && allowed.Length > 0)
@@ -220,7 +220,7 @@ public static class BalancerProbe
         var first = await FetchAsync(entry, sp, auth, desiredSeason, -1, timeoutSec, ct);
         if (first.jo != null)
         {
-            Console.WriteLine($"[EpWatch] probe {entry.balanser} s={desiredSeason} keys: [{string.Join(",", first.jo.Properties().Select(p => p.Name))}]");
+            Log.Dbg($"[EpWatch] probe {entry.balanser} s={desiredSeason} keys: [{string.Join(",", first.jo.Properties().Select(p => p.Name))}]");
             CollectVoices(first.jo, voices, entry.balanser);
             maxEp = CollectMaxEpisode(first.jo, voiceName);
 
@@ -237,11 +237,11 @@ public static class BalancerProbe
                     else
                     {
                         var byVoiceUrl = AppendQs(first.url, "t=" + vinfo.token);
-                        Console.WriteLine($"[EpWatch] probe {entry.balanser} voice url: {byVoiceUrl}");
+                        Log.Dbg($"[EpWatch] probe {entry.balanser} voice url: {Log.Url(byVoiceUrl)}");
                         var byVoice = await FetchByUrlAsync(byVoiceUrl, auth, timeoutSec, ct);
                         if (byVoice != null)
                         {
-                            Console.WriteLine($"[EpWatch] probe {entry.balanser} t={vinfo.token} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
+                            Log.Dbg($"[EpWatch] probe {entry.balanser} t={vinfo.token} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
                             var voiceMax = CollectMaxEpisode(byVoice, null);
                             if (voiceMax > maxEp) maxEp = voiceMax;
                         }
@@ -255,7 +255,7 @@ public static class BalancerProbe
             var disc = await FetchAsync(entry, sp, auth, -1, -1, timeoutSec, ct);
             if (disc.jo != null)
             {
-                Console.WriteLine($"[EpWatch] probe {entry.balanser} discovery keys: [{string.Join(",", disc.jo.Properties().Select(p => p.Name))}]");
+                Log.Dbg($"[EpWatch] probe {entry.balanser} discovery keys: [{string.Join(",", disc.jo.Properties().Select(p => p.Name))}]");
                 CollectVoices(disc.jo, voices, entry.balanser);
                 var tree = ExtractSeasonTree(disc.jo);
                 if (tree.Count > 0)
@@ -263,14 +263,14 @@ public static class BalancerProbe
                     int pick = tree.ContainsKey(desiredSeason)
                         ? desiredSeason
                         : tree.Keys.Max();
-                    Console.WriteLine($"[EpWatch] probe {entry.balanser} season tree: [{string.Join(",", tree.Keys)}] -> s={pick}");
+                    Log.Dbg($"[EpWatch] probe {entry.balanser} season tree: [{string.Join(",", tree.Keys)}] -> s={pick}");
 
                     var followUrl = tree[pick];
-                    Console.WriteLine($"[EpWatch] probe {entry.balanser} following season url: {followUrl}");
+                    Log.Dbg($"[EpWatch] probe {entry.balanser} following season url: {Log.Url(followUrl)}");
                     var second = await FetchByUrlAsync(followUrl, auth, timeoutSec, ct);
                     if (second != null)
                     {
-                        Console.WriteLine($"[EpWatch] probe {entry.balanser} s={pick} keys: [{string.Join(",", second.Properties().Select(p => p.Name))}]");
+                        Log.Dbg($"[EpWatch] probe {entry.balanser} s={pick} keys: [{string.Join(",", second.Properties().Select(p => p.Name))}]");
                         CollectVoices(second, voices, entry.balanser);
 
                         if (pick == desiredSeason || desiredSeason < 0)
@@ -290,11 +290,11 @@ public static class BalancerProbe
                                     else
                                     {
                                         var byVoiceUrl = AppendQs(followUrl, "t=" + vinfo.token);
-                                        Console.WriteLine($"[EpWatch] probe {entry.balanser} voice url: {byVoiceUrl}");
+                                        Log.Dbg($"[EpWatch] probe {entry.balanser} voice url: {Log.Url(byVoiceUrl)}");
                                         var byVoice = await FetchByUrlAsync(byVoiceUrl, auth, timeoutSec, ct);
                                         if (byVoice != null)
                                         {
-                                            Console.WriteLine($"[EpWatch] probe {entry.balanser} t={vinfo.token} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
+                                            Log.Dbg($"[EpWatch] probe {entry.balanser} t={vinfo.token} keys: [{string.Join(",", byVoice.Properties().Select(p => p.Name))}]");
                                             var voiceMax = CollectMaxEpisode(byVoice, null);
                                             if (voiceMax > maxEp) maxEp = voiceMax;
                                         }
@@ -304,7 +304,7 @@ public static class BalancerProbe
                         }
                         else
                         {
-                            Console.WriteLine($"[EpWatch] probe {entry.balanser} requested s={desiredSeason} not in tree [{string.Join(",", tree.Keys)}]; not counting s={pick} episodes");
+                            Log.Dbg($"[EpWatch] probe {entry.balanser} requested s={desiredSeason} not in tree [{string.Join(",", tree.Keys)}]; not counting s={pick} episodes");
                         }
                     }
                 }
@@ -315,7 +315,7 @@ public static class BalancerProbe
             }
         }
 
-        Console.WriteLine($"[EpWatch] probe {entry.balanser} parsed: voices={voices.Count}, max_e={maxEp}");
+        Log.Dbg($"[EpWatch] probe {entry.balanser} parsed: voices={voices.Count}, max_e={maxEp}");
         return (maxEp, voices);
     }
 
@@ -345,7 +345,7 @@ public static class BalancerProbe
 
         if (jo.Value<string>("type") == "similar")
         {
-            Console.WriteLine($"[EpWatch] movie {entry.balanser} similar -> ignored (no exact match)");
+            Log.Dbg($"[EpWatch] movie {entry.balanser} similar -> ignored (no exact match)");
             return (false, new List<string>());
         }
 
@@ -369,7 +369,7 @@ public static class BalancerProbe
 
         bool playable = (data?.Count ?? 0) > 0 || names.Count > 0;
 
-        Console.WriteLine($"[EpWatch] movie probe {entry.balanser} -> available={playable}, voices={names.Count} [{string.Join(", ", names)}]");
+        Log.Dbg($"[EpWatch] movie probe {entry.balanser} -> available={playable}, voices={names.Count} [{string.Join(", ", names)}]");
         return (playable, names);
     }
 
@@ -404,7 +404,7 @@ public static class BalancerProbe
             using var resp = await http.GetAsync(url, cts.Token);
             if (!resp.IsSuccessStatusCode)
             {
-                Console.WriteLine($"[EpWatch] follow HTTP {(int)resp.StatusCode}: {url}");
+                Log.Dbg($"[EpWatch] follow HTTP {(int)resp.StatusCode}: {Log.Url(url)}");
                 return null;
             }
             var body = await resp.Content.ReadAsStringAsync(cts.Token);
@@ -414,12 +414,12 @@ public static class BalancerProbe
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested && !ct.IsCancellationRequested)
         {
-            Console.WriteLine($"[EpWatch] follow timeout: {url}");
+            Log.Dbg($"[EpWatch] follow timeout: {Log.Url(url)}");
             return null;
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] follow failed: {ex.Message}");
+            Log.Dbg($"[EpWatch] follow failed: {ex.Message}");
             return null;
         }
     }
@@ -439,13 +439,13 @@ public static class BalancerProbe
             using var resp = await http.GetAsync(url, cts.Token);
             if (!resp.IsSuccessStatusCode)
             {
-                Console.WriteLine($"[EpWatch] probe {entry.balanser} s={s} HTTP {(int)resp.StatusCode}");
+                Log.Dbg($"[EpWatch] probe {entry.balanser} s={s} HTTP {(int)resp.StatusCode}");
                 return (null, url);
             }
             var body = await resp.Content.ReadAsStringAsync(cts.Token);
             if (string.IsNullOrWhiteSpace(body) || body == "null")
             {
-                Console.WriteLine($"[EpWatch] probe {entry.balanser} s={s} empty body");
+                Log.Dbg($"[EpWatch] probe {entry.balanser} s={s} empty body");
                 return (null, url);
             }
             JObject jo;
@@ -453,7 +453,7 @@ public static class BalancerProbe
             catch
             {
                 var preview = body.Length > 200 ? body.Substring(0, 200) : body;
-                Console.WriteLine($"[EpWatch] probe {entry.balanser} s={s} non-JSON ({body.Length} chars): {preview}");
+                Log.Dbg($"[EpWatch] probe {entry.balanser} s={s} non-JSON ({body.Length} chars): {preview}");
                 return (null, url);
             }
 
@@ -466,11 +466,11 @@ public static class BalancerProbe
                     var sel = s >= 0 ? $"s={s}" : "s=-1";
                     if (t >= 0) sel += $"&t={t}";
                     var followUrl = AppendQs(bu, sel);
-                    Console.WriteLine($"[EpWatch] probe {entry.balanser} similar -> \"{best.Value<string>("title")}\" (s={s})");
+                    Log.Dbg($"[EpWatch] probe {entry.balanser} similar -> \"{best.Value<string>("title")}\" (s={s})");
                     var followed = await FetchByUrlAsync(followUrl, auth, timeoutSec, ct);
                     if (followed != null) return (followed, followUrl);
                 }
-                Console.WriteLine($"[EpWatch] probe {entry.balanser} s={s} similar unresolved ({(jo["data"] as JArray)?.Count ?? 0} candidates)");
+                Log.Dbg($"[EpWatch] probe {entry.balanser} s={s} similar unresolved ({(jo["data"] as JArray)?.Count ?? 0} candidates)");
                 return (null, url);
             }
 
@@ -478,12 +478,12 @@ public static class BalancerProbe
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested && !ct.IsCancellationRequested)
         {
-            Console.WriteLine($"[EpWatch] probe {entry.balanser} s={s} timeout after {timeoutSec}s");
+            Log.Dbg($"[EpWatch] probe {entry.balanser} s={s} timeout after {timeoutSec}s");
             return (null, url);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] probe {entry.balanser} s={s} failed: {ex.Message}");
+            Log.Dbg($"[EpWatch] probe {entry.balanser} s={s} failed: {ex.Message}");
             return (null, url);
         }
     }

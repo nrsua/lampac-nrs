@@ -183,15 +183,15 @@ public class ApiController : BaseController
 
         var lang = await UserLang();
         var auth = RequestAuth();
-        Console.WriteLine($"[EpWatch] /voices IN: tmdb={tmdb_id} title=\"{title}\" year={year} season={season} lang={lang} auth.token={auth.token ?? "-"} auth.email={auth.account_email ?? "-"} auth.uid={auth.uid ?? "-"}");
+        Log.Dbg($"[EpWatch] /voices IN: tmdb={tmdb_id} title=\"{title}\" year={year} season={season} lang={lang} auth={(auth.IsEmpty ? "no" : "yes")}");
 
         var show = await TmdbClient.GetShowAsync(tmdb_id, lang, HttpContext.RequestAborted);
         int activeSeason = season > 0 ? season : (show?.latest_aired_season ?? 1);
         int probeSeason = season > 0 ? season : 1;
         if (show == null)
-            Console.WriteLine($"[EpWatch] /voices: TMDB lookup returned null for tmdb_id={tmdb_id}");
+            Log.Dbg($"[EpWatch] /voices: TMDB lookup returned null for tmdb_id={tmdb_id}");
         else
-            Console.WriteLine($"[EpWatch] /voices: TMDB ok name=\"{show.name}\" original=\"{show.original_name}\" lang={show.original_language} imdb={show.imdb_id} year={show.first_air_year} status={show.status} season_aired={show.current_season_aired}/{show.current_season_total}");
+            Log.Dbg($"[EpWatch] /voices: TMDB ok name=\"{show.name}\" original=\"{show.original_name}\" lang={show.original_language} imdb={show.imdb_id} year={show.first_air_year} status={show.status} season_aired={show.current_season_aired}/{show.current_season_total}");
 
         var sp = new Models.ShowParams
         {
@@ -205,7 +205,7 @@ public class ApiController : BaseController
 
         var balancers = await BalancerProbe.GetAvailableAsync(sp, auth, HttpContext.RequestAborted);
         if (balancers.Count > 0)
-            Console.WriteLine($"[EpWatch] /voices balancers: {string.Join(", ", balancers.Select(b => b.balanser + "@" + b.name))}");
+            Log.Dbg($"[EpWatch] /voices balancers: {string.Join(", ", balancers.Select(b => b.balanser + "@" + b.name))}");
 
         var probeTasks = balancers
             .Select(b => BalancerProbe.ProbeAsync(b, sp, probeSeason, null, auth, HttpContext.RequestAborted))
@@ -224,7 +224,7 @@ public class ApiController : BaseController
             .Select(g => g.First())
             .ToList();
 
-        Console.WriteLine($"[EpWatch] /voices tmdb={tmdb_id} probe_s={probeSeason} report_s={activeSeason} -> balancers:{balancers.Count} voices:{dedup.Count}");
+        Log.Dbg($"[EpWatch] /voices tmdb={tmdb_id} probe_s={probeSeason} report_s={activeSeason} -> balancers:{balancers.Count} voices:{dedup.Count}");
 
         return Json(new
         {
@@ -258,7 +258,7 @@ public class ApiController : BaseController
         };
 
         var balancers = await BalancerProbe.GetAvailableAsync(sp, auth, HttpContext.RequestAborted, movie: true);
-        Console.WriteLine($"[EpWatch] /balancers tmdb={tmdb_id} -> {balancers.Count}");
+        Log.Dbg($"[EpWatch] /balancers tmdb={tmdb_id} -> {balancers.Count}");
 
         return Json(new
         {
@@ -289,7 +289,7 @@ public class ApiController : BaseController
     {
         RememberLocalHost();
         var uid = Uid();
-        Console.WriteLine($"[EpWatch] /subscribe IN uid=\"{uid}\"");
+        Log.Dbg($"[EpWatch] /subscribe IN uid=\"{uid}\"");
         if (string.IsNullOrEmpty(uid))
             return Json(new { success = false, msg = "no_uid" });
 
@@ -297,18 +297,18 @@ public class ApiController : BaseController
         using (var sr = new StreamReader(Request.Body, Encoding.UTF8))
             body = await sr.ReadToEndAsync();
 
-        Console.WriteLine($"[EpWatch] /subscribe body: {body}");
+        Log.Dbg($"[EpWatch] /subscribe body: {body}");
 
         SubscribeBody data;
         try { data = JsonConvert.DeserializeObject<SubscribeBody>(body); }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] /subscribe bad_body parse: {ex.Message}");
+            Log.Warn($"[EpWatch] /subscribe bad_body parse: {ex.Message}");
             return Json(new { success = false, msg = "bad_body" });
         }
         if (data == null || data.tmdb_id <= 0 || string.IsNullOrWhiteSpace(data.title))
         {
-            Console.WriteLine($"[EpWatch] /subscribe bad_body: tmdb_id={data?.tmdb_id} title=\"{data?.title}\"");
+            Log.Warn($"[EpWatch] /subscribe bad_body: tmdb_id={data?.tmdb_id} title=\"{data?.title}\"");
             return Json(new { success = false, msg = "bad_body" });
         }
 
@@ -367,7 +367,7 @@ public class ApiController : BaseController
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[EpWatch] /subscribe resolve failed: {ex.Message}");
+                    Log.Warn($"[EpWatch] /subscribe resolve failed: {ex.Message}");
                 }
             }
 
@@ -394,11 +394,11 @@ public class ApiController : BaseController
                         if (probed.maxEpisode > initialLastVoiceEpisode)
                             initialLastVoiceEpisode = probed.maxEpisode;
                     }
-                    Console.WriteLine($"[EpWatch] /subscribe initial probe: voice=\"{v}\" season={effectiveSeason} -> last_voice_episode={initialLastVoiceEpisode}, structure={structureSource}, tvdb={tvdbId}");
+                    Log.Dbg($"[EpWatch] /subscribe initial probe: voice=\"{v}\" season={effectiveSeason} -> last_voice_episode={initialLastVoiceEpisode}, structure={structureSource}, tvdb={tvdbId}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[EpWatch] /subscribe initial probe failed: {ex.Message}");
+                    Log.Warn($"[EpWatch] /subscribe initial probe failed: {ex.Message}");
                 }
             }
         }
@@ -456,11 +456,11 @@ public class ApiController : BaseController
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] /subscribe SaveChanges failed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+            Log.Warn($"[EpWatch] /subscribe SaveChanges failed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
             return Json(new { success = false, msg = "db_error", detail = ex.Message });
         }
 
-        Console.WriteLine($"[EpWatch] /subscribe OK chat_id={user.chat_id} tmdb_id={data.tmdb_id} voice=\"{v}\" balancer=\"{data.balancer}\"");
+        Log.Info($"[EpWatch] /subscribe OK chat_id={user.chat_id} tmdb_id={data.tmdb_id} voice=\"{v}\" balancer=\"{data.balancer}\"");
 
         if (Notifier.Ready)
         {
@@ -524,11 +524,11 @@ public class ApiController : BaseController
                 var vlist = probedAll[i].voices.Count > 0 ? probedAll[i].voices : new System.Collections.Generic.List<string> { "" };
                 foreach (var v in vlist) seen.Add(balancers[i].balanser + "\t" + v);
             }
-            Console.WriteLine($"[EpWatch] /subscribe movie baseline: {seen.Count} voices already present");
+            Log.Dbg($"[EpWatch] /subscribe movie baseline: {seen.Count} voices already present");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] /subscribe movie baseline probe failed: {ex.Message}");
+            Log.Warn($"[EpWatch] /subscribe movie baseline probe failed: {ex.Message}");
         }
 
         var seedCsv = string.Join("\n", seen);
@@ -566,7 +566,7 @@ public class ApiController : BaseController
         try { await db.SaveChangesAsync(); }
         catch (Exception ex)
         {
-            Console.WriteLine($"[EpWatch] /subscribe movie save failed: {ex.Message}");
+            Log.Warn($"[EpWatch] /subscribe movie save failed: {ex.Message}");
             return Json(new { success = false, msg = "db_error" });
         }
 
@@ -576,7 +576,7 @@ public class ApiController : BaseController
             _ = Notifier.SendTextAsync(user.chat_id, Strings.T(L, "movie_sub_added", Notifier.Esc(title), Notifier.Esc(balName)), HttpContext.RequestAborted);
         }
 
-        Console.WriteLine($"[EpWatch] /subscribe MOVIE chat_id={user.chat_id} tmdb_id={data.tmdb_id} balancer=\"{data.balancer}\"");
+        Log.Info($"[EpWatch] /subscribe MOVIE chat_id={user.chat_id} tmdb_id={data.tmdb_id} balancer=\"{data.balancer}\"");
         return Json(new { success = true });
     }
     #endregion

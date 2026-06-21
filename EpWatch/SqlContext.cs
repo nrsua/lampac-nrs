@@ -80,7 +80,7 @@ public class SqlContext : DbContext
                 db.Database.ExecuteSqlRaw($"ALTER TABLE {table} ADD COLUMN {name} {decl}");
 #pragma warning restore EF1002
             }
-            catch (Exception ex) { Console.WriteLine($"[EpWatch] migrate {table}.{name}: {ex.Message}"); }
+            catch (Exception ex) { Log.Dbg($"[EpWatch] migrate {table}.{name}: {ex.Message}"); }
         }
     }
 

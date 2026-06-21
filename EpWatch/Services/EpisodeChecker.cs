@@ -36,7 +36,7 @@ public sealed class EpisodeChecker : BackgroundService
         {
             try { await CheckOnceAsync(null, ct); }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
-            catch (Exception ex) { Console.WriteLine($"[EpWatch] check loop error: {ex.Message}"); }
+            catch (Exception ex) { Log.Warn($"[EpWatch] check loop error: {ex.Message}"); }
 
             try { await Task.Delay(interval, ct); }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
@@ -156,7 +156,7 @@ public sealed class EpisodeChecker : BackgroundService
                         var newSrc = await StructureResolver.ResolveAsync(show, tvdb, refBal, sp, subAuth, ct);
                         if (!string.Equals(newSrc, sub.structure_source ?? "", StringComparison.OrdinalIgnoreCase))
                         {
-                            Console.WriteLine($"[EpWatch] re-resolve structure {sub.tmdb_id}/{sub.chat_id}: '{sub.structure_source}' -> '{newSrc}'");
+                            Log.Dbg($"[EpWatch] re-resolve structure {sub.tmdb_id}/{sub.chat_id}: '{sub.structure_source}' -> '{newSrc}'");
                             sub.structure_source = newSrc;
                             sub.tvdb_id = tvdb.tvdb_id;
                             es = await EffectiveStructure.BuildAsync(sub, show, tvdb, latestSeason, lang, ct);
@@ -215,7 +215,7 @@ public sealed class EpisodeChecker : BackgroundService
 
                         if (newMax > sub.last_episode)
                         {
-                            Console.WriteLine($"[EpWatch] voice cap {sub.tmdb_id}/{sub.chat_id} s={effectiveSeason}: balancer={newMax} > tmdb_aired={sub.last_episode}, capping");
+                            Log.Dbg($"[EpWatch] voice cap {sub.tmdb_id}/{sub.chat_id} s={effectiveSeason}: balancer={newMax} > tmdb_aired={sub.last_episode}, capping");
                             newMax = sub.last_episode;
                         }
 
@@ -280,7 +280,7 @@ public sealed class EpisodeChecker : BackgroundService
                     sb.Append($"[EpWatch] sub {sub.tmdb_id}/{sub.chat_id} error: {ex.GetType().Name}: {ex.Message}");
                     for (var inner = ex.InnerException; inner != null; inner = inner.InnerException)
                         sb.Append($" -> {inner.GetType().Name}: {inner.Message}");
-                    Console.WriteLine(sb.ToString());
+                    Log.Warn(sb.ToString());
                 }
             }
         }
@@ -348,7 +348,7 @@ public sealed class EpisodeChecker : BackgroundService
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EpWatch] movie sub {sub.tmdb_id}/{sub.chat_id} error: {ex.Message}");
+                Log.Warn($"[EpWatch] movie sub {sub.tmdb_id}/{sub.chat_id} error: {ex.Message}");
             }
         }
 

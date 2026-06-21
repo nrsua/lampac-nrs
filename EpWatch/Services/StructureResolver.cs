@@ -63,7 +63,7 @@ public static class StructureResolver
         else
             src = scoreV > scoreT ? TVDB : TMDB;
 
-        Console.WriteLine($"[EpWatch] structure resolve {balancer.balanser}: tmdbSeasons={tmdbSeasons} tvdbSeasons={tvdbSeasons} bal={balCount} scoreT={scoreT} scoreV={scoreV} -> {src}");
+        Log.Dbg($"[EpWatch] structure resolve {balancer.balanser}: tmdbSeasons={tmdbSeasons} tvdbSeasons={tvdbSeasons} bal={balCount} scoreT={scoreT} scoreV={scoreV} -> {src}");
         return src;
     }
 
