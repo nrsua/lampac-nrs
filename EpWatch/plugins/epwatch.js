@@ -9,7 +9,7 @@
 
     var META = {
         name:    'EpWatch',
-        version: '0.2.2',
+        version: '0.2.3',
         author:  'nrsua'
     };
 
@@ -50,7 +50,7 @@
         epwatch_close:                 { uk: 'Закрити',                         en: 'Close',                               ru: 'Закрыть' },
         epwatch_settings_unlink:       { uk: 'Відв’язати Telegram',             en: 'Unlink Telegram',                     ru: 'Отвязать Telegram' },
         epwatch_settings_uid:          { uk: 'Перевизначення Sync UID',         en: 'Sync UID override',                   ru: 'Переопределение Sync UID' },
-        epwatch_settings_uid_desc:     { uk: 'Якщо заповнено, цей UID використовується замість локального lampa_uid (лише для EpWatch). Однаковий на різних пристроях - спільні підписки.', en: 'If set, this UID is used instead of the local lampa_uid (EpWatch only). The same value on different devices - shared subscriptions.', ru: 'Если заполнено, этот UID используется вместо локального lampa_uid (только для EpWatch). Одинаковый на разных устройствах - общие подписки.' },
+        epwatch_settings_uid_desc:     { uk: 'За замовчуванням EpWatch використовує локальний UID. Щоб використати інший - змініть на свій. Однаковий на різних пристроях - спільні підписки.', en: 'By default EpWatch uses the local UID. To use another one - change it to your own. The same UID on different devices - shared subscriptions.', ru: 'По умолчанию EpWatch использует локальный UID. Чтобы использовать другой - измените на свой. Одинаковый на разных устройствах - общие подписки.' },
         epwatch_unlink_confirm:        { uk: 'Видалити прив’язку та всі підписки?', en: 'Remove the link and all subscriptions?', ru: 'Удалить привязку и все подписки?' },
         epwatch_unlink_done:           { uk: 'Прив’язку видалено',              en: 'Link removed',                        ru: 'Привязка удалена' },
         epwatch_yes:                   { uk: 'Так',                             en: 'Yes',                                 ru: 'Да' },
@@ -85,6 +85,15 @@
     function customUid() {
         try { return (('' + (Lampa.Storage.get('epwatch_uid', '') || '')).trim()); }
         catch (e) { return ''; }
+    }
+
+    function localUid() {
+        try {
+            var u = Lampa.Storage.get('token', '') ||
+                    Lampa.Storage.get('account_email', '') ||
+                    Lampa.Storage.get('lampac_unic_id', '');
+            return ('' + (u || token() || '')).trim();
+        } catch (e) { return ''; }
     }
 
     function authQs() {
@@ -788,10 +797,18 @@
 
         Lampa.SettingsApi.addParam({
             component: 'epwatch',
-            param: { name: 'epwatch_uid', type: 'input', values: '', 'default': '' },
+            param: { name: 'epwatch_uid', type: 'input', values: '', 'default': localUid() },
             field: {
                 name:        L('epwatch_settings_uid'),
                 description: L('epwatch_settings_uid_desc')
+            },
+            onRender: function (item) {
+                try {
+                    if (!customUid()) {
+                        var lu = localUid();
+                        if (lu) item.find('.settings-param__value').text(lu);
+                    }
+                } catch (e) {}
             },
             onChange: function () {}
         });
