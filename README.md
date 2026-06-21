@@ -9,6 +9,7 @@
 - [LampaParty - Watch with friends](#lampaparty---дивитися-з-друзями)
 - [EpWatch - Episode Watcher](#epwatch---episode-watcher)
 
+TG - https://t.me/devnrs
 ---
 
 ## LampaParty - Watch with friends
