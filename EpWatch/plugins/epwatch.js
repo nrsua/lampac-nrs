@@ -43,6 +43,8 @@
         epwatch_settings_link:         { uk: 'Прив’язати Telegram',             en: 'Link Telegram',                       ru: 'Привязать Telegram' },
         epwatch_settings_lang_auto:    { uk: 'Авто',                            en: 'Auto',                                ru: 'Авто' },
         epwatch_link_qr_hint:          { uk: 'Скануйте QR або відкрийте бота',  en: 'Scan the QR or open the bot',         ru: 'Сканируйте QR или откройте бота' },
+        epwatch_link_manual:           { uk: 'Бот уже запускався? Натисніть «Вже писав боту» і просто надішліть готове повідомлення.', en: 'Bot already started? Tap "Already used the bot" and just send the prepared message.', ru: 'Бот уже запускался? Нажмите «Уже писал боту» и просто отправьте готовое сообщение.' },
+        epwatch_link_open_text:        { uk: 'Вже писав боту', en: 'Already used the bot', ru: 'Уже писал боту' },
         epwatch_linked:                { uk: 'Telegram-бот прив’язаний',        en: 'Telegram bot linked',                 ru: 'Telegram-бот привязан' },
         epwatch_close:                 { uk: 'Закрити',                         en: 'Close',                               ru: 'Закрыть' },
         epwatch_settings_unlink:       { uk: 'Відв’язати Telegram',             en: 'Unlink Telegram',                     ru: 'Отвязать Telegram' },
@@ -646,6 +648,7 @@
             '.epwatch-link__bot{font-size:1.4em;font-weight:600;margin-bottom:0.3em}' +
             '.epwatch-link__hint{opacity:0.6;font-size:1em;margin-bottom:0.8em}' +
             '.epwatch-link__url{font-size:0.85em;opacity:0.5;word-break:break-all;max-width:30em;margin:0 auto;line-height:1.4}' +
+            '.epwatch-link__manual{font-size:0.85em;opacity:0.7;max-width:30em;margin:0.8em auto 0;line-height:1.4}' +
             '.card__subscribe{font-size:0.85em}' +
             '.card__subscribe-tmdb{display:block;font-size:0.72em;opacity:0.55;margin-top:0.15em;line-height:1.1;letter-spacing:0.02em}';
         var style = document.createElement('style');
@@ -665,12 +668,16 @@
                 '<div class="epwatch-link__bot">' + botName + '</div>' +
                 '<div class="epwatch-link__hint">' + L('epwatch_link_qr_hint') + '</div>' +
                 '<div class="epwatch-link__url">' + link + '</div>' +
+                '<div class="epwatch-link__manual">' + L('epwatch_link_manual') + '</div>' +
             '</div>'
         );
+
+        var textLink = link.indexOf('?start=') >= 0 ? link.replace('?start=', '?text=') : link;
 
         var footer = $(
             '<div class="modal__footer">' +
                 '<div class="modal__button selector epwatch-link__open">' + L('epwatch_link_open_bot') + '</div>' +
+                '<div class="modal__button selector epwatch-link__text">' + L('epwatch_link_open_text') + '</div>' +
                 '<div class="modal__button selector epwatch-link__close">' + L('epwatch_close') + '</div>' +
             '</div>'
         );
@@ -694,6 +701,7 @@
         };
 
         footer.find('.epwatch-link__open').on('hover:enter', function () { openExternal(link); });
+        footer.find('.epwatch-link__text').on('hover:enter', function () { openExternal(textLink); });
         footer.find('.epwatch-link__close').on('hover:enter', function () { closeAndCallback(); });
 
         Lampa.Modal.open({

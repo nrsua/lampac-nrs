@@ -159,6 +159,20 @@ public sealed class TelegramBotService : BackgroundService
             return;
         }
 
+        if (text.StartsWith("link_") || text.Contains("start=link_", StringComparison.OrdinalIgnoreCase))
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(text, @"link_([^\s&]+)");
+            if (m.Success)
+            {
+                var uid = m.Groups[1].Value;
+                var lang = Strings.Normalize(from?.Value<string>("language_code"));
+                await LinkUser(uid, chatId, from?.Value<string>("username"), lang, ct);
+                await PublishCommands(bot, lang, chatId, ct);
+                await bot.SendMessageAsync(chatId, Strings.T(lang, "linked"), MainKb(lang), Notifier.PARSE_MODE, ct);
+                return;
+            }
+        }
+
         var L = await GetLang(chatId, ct);
 
         if (text == "/list" || text == Strings.T(L, "btn_subs"))
