@@ -174,6 +174,8 @@ public sealed class EpisodeChecker : BackgroundService
                         changed = true;
                     }
 
+                    var toNotify = new List<TmdbEpisode>();
+
                     foreach (var ep in airedNow.OrderBy(x => x.episode))
                     {
                         if (ep.episode <= sub.last_episode) continue;
@@ -186,9 +188,9 @@ public sealed class EpisodeChecker : BackgroundService
                                 AddSummary(summary, sub, ep);
                                 notified++;
                             }
-                            else if (await Notifier.SendEpisodeAsync(sub, ep, ct, lang))
+                            else
                             {
-                                notified++;
+                                toNotify.Add(ep);
                             }
                         }
 
@@ -230,14 +232,20 @@ public sealed class EpisodeChecker : BackgroundService
                                     AddSummary(summary, sub, epInfo);
                                     notified++;
                                 }
-                                else if (await Notifier.SendEpisodeAsync(sub, epInfo, ct, lang))
+                                else
                                 {
-                                    notified++;
+                                    toNotify.Add(epInfo);
                                 }
                             }
                             sub.last_voice_episode = newMax;
                             changed = true;
                         }
+                    }
+
+                    if (!aggregate && toNotify.Count > 0)
+                    {
+                        if (await Notifier.SendEpisodesBatchAsync(sub, toNotify, lang, ct))
+                            notified += toNotify.Count;
                     }
 
                     sub.season_total = es.seasonTotal;

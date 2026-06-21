@@ -64,6 +64,48 @@ public static class Notifier
         }
     }
 
+    public static async Task<bool> SendEpisodesBatchAsync(SubscriptionRow sub, List<TmdbEpisode> eps, string lang, CancellationToken ct)
+    {
+        if (Bot == null || eps == null || eps.Count == 0) return false;
+        if (eps.Count == 1) return await SendEpisodeAsync(sub, eps[0], ct, lang);
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append("🎬 ");
+        var idtag = IdTag(sub.media_type, sub.tmdb_id);
+        if (idtag.Length > 0) sb.Append(idtag).Append(' ');
+        sb.Append("<b>").Append(Esc(sub.title)).Append("</b>\n");
+
+        if (!string.IsNullOrEmpty(sub.voice))
+        {
+            sb.Append("🎙 ").Append(Esc(sub.voice)).Append('\n');
+            if (!string.IsNullOrEmpty(sub.balancer))
+                sb.Append("🌐 ").Append(Esc(BalancerProbe.DisplayName(sub.balancer))).Append('\n');
+        }
+
+        sb.Append('\n');
+        foreach (var ep in eps.OrderBy(e => e.episode))
+        {
+            sb.Append("🆕 <b>").Append(FormatSE(ep.season, ep.episode)).Append("</b>");
+            if (!string.IsNullOrEmpty(ep.name))
+                sb.Append(" - <i>").Append(Esc(ep.name)).Append("</i>");
+            sb.Append('\n');
+        }
+
+        var openBtn = OpenButton(sub.media_type, sub.tmdb_id, lang);
+        object kb = openBtn != null ? TgMarkup.Inline(new[] { openBtn }) : null;
+
+        try
+        {
+            await Bot.SendMessageAsync(sub.chat_id, sb.ToString(), kb, PARSE_MODE, ct);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EpWatch] batch notify failed: {ex.Message}");
+            return false;
+        }
+    }
+
     public static async Task<bool> SendMovieAvailableAsync(SubscriptionRow sub, List<(string balancer, string voice)> items, string lang, CancellationToken ct)
     {
         if (Bot == null || items == null || items.Count == 0) return false;
