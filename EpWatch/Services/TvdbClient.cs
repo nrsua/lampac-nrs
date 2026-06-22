@@ -128,6 +128,7 @@ public static class TvdbClient
                         absolute = e.Value<int?>("absoluteEpisodeNumber") ?? 0,
                         title = e.Value<string>("title") ?? "",
                         overview = e.Value<string>("overview") ?? "",
+                        image = e.Value<string>("image") ?? "",
                         air_date = air
                     });
                 }

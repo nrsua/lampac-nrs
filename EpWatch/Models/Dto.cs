@@ -85,6 +85,7 @@ public class TvdbEpisode
     public int absolute { get; set; }
     public string title { get; set; }
     public string overview { get; set; }
+    public string image { get; set; }
     public DateTime? air_date { get; set; }
 }
 

@@ -48,11 +48,13 @@ public static class Notifier
         var openBtn = OpenButton(sub.media_type, sub.tmdb_id, lang);
         object kb = openBtn != null ? TgMarkup.Inline(new[] { openBtn }) : null;
 
+        var photo = !string.IsNullOrEmpty(ep.still_url) ? ep.still_url : PosterUrl(sub.poster_path);
+
         try
         {
             var msg = sb.ToString();
-            if (!string.IsNullOrEmpty(ep.still_url))
-                await Bot.SendPhotoAsync(sub.chat_id, ep.still_url, msg, PARSE_MODE, kb, ct);
+            if (!string.IsNullOrEmpty(photo))
+                await Bot.SendPhotoAsync(sub.chat_id, photo, msg, PARSE_MODE, kb, ct);
             else
                 await Bot.SendMessageAsync(sub.chat_id, msg, kb, PARSE_MODE, ct);
             return true;
@@ -182,6 +184,13 @@ public static class Notifier
         var url = OpenUrl(mediaType, tmdbId);
         if (string.IsNullOrEmpty(url)) return null;
         return TgMarkup.BtnUrl(Strings.T(lang, "open_button"), url);
+    }
+
+    static string PosterUrl(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+        if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return path;
+        return "https://image.tmdb.org/t/p/w500" + path;
     }
 
     static string OpenUrl(string mediaType, int tmdbId)

@@ -26,7 +26,7 @@ public sealed class EffectiveStructure
         if (tvdbReady && string.Equals(sub.structure_source, StructureResolver.TVDB, StringComparison.OrdinalIgnoreCase))
             return await BuildTvdbAsync(sub, show, tvdb, lang, ct);
 
-        return await BuildTmdbAsync(sub, show, latestSeason, lang, ct);
+        return await BuildTmdbAsync(sub, show, tvdb, latestSeason, lang, ct);
     }
 
     static async Task<EffectiveStructure> BuildAbsoluteAsync(
@@ -58,7 +58,7 @@ public sealed class EffectiveStructure
     }
 
     static async Task<EffectiveStructure> BuildTmdbAsync(
-        SubscriptionRow sub, TmdbShow show, int latestSeason, string lang, CancellationToken ct)
+        SubscriptionRow sub, TmdbShow show, TvdbShow tvdb, int latestSeason, string lang, CancellationToken ct)
     {
         var es = new EffectiveStructure
         {
@@ -84,7 +84,38 @@ public sealed class EffectiveStructure
             es.seasonTotal = sInfo?.episode_count ?? 0;
             es.seasonAired = es.aired.Count;
         }
+
+        EnrichFromTvdb(es.aired, tvdb);
         return es;
+    }
+
+    static void EnrichFromTvdb(List<TmdbEpisode> eps, TvdbShow tvdb)
+    {
+        if (tvdb == null || tvdb.episodes.Count == 0) return;
+
+        foreach (var ep in eps)
+        {
+            var te = tvdb.episodes.FirstOrDefault(x => x.season == ep.season && x.episode == ep.episode);
+            if (te == null) continue;
+
+            if (string.IsNullOrEmpty(ep.overview) && !string.IsNullOrEmpty(te.overview))
+                ep.overview = te.overview;
+
+            if ((string.IsNullOrEmpty(ep.name) || IsGenericName(ep.name)) && !string.IsNullOrEmpty(te.title))
+                ep.name = te.title;
+
+            if (string.IsNullOrEmpty(ep.still_url) && !string.IsNullOrEmpty(te.image)
+                && te.image.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                ep.still_url = te.image;
+        }
+    }
+
+    static bool IsGenericName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return true;
+        return System.Text.RegularExpressions.Regex.IsMatch(
+            name.Trim(), @"^(?:Episode|Серія|Серия|Эпизод|Епізод)\s*\d+$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
     static async Task<EffectiveStructure> BuildTvdbAsync(
