@@ -213,10 +213,11 @@ public sealed class EpisodeChecker : BackgroundService
                             if (throttle > TimeSpan.Zero) await Task.Delay(throttle, ct);
                         }
 
-                        if (newMax > sub.last_episode)
+                        int seasonCap = es.seasonTotal > 0 ? es.seasonTotal : newMax;
+                        if (newMax > seasonCap)
                         {
-                            Log.Dbg($"[EpWatch] voice cap {sub.tmdb_id}/{sub.chat_id} s={effectiveSeason}: balancer={newMax} > tmdb_aired={sub.last_episode}, capping");
-                            newMax = sub.last_episode;
+                            Log.Dbg($"[EpWatch] voice cap {sub.tmdb_id}/{sub.chat_id} s={effectiveSeason}: balancer={newMax} > season_total={seasonCap}, capping");
+                            newMax = seasonCap;
                         }
 
                         if (newMax > sub.last_voice_episode)
@@ -224,6 +225,7 @@ public sealed class EpisodeChecker : BackgroundService
                             for (int e = sub.last_voice_episode + 1; e <= newMax; e++)
                             {
                                 var epInfo = airedNow.FirstOrDefault(x => x.episode == e)
+                                             ?? es.allEpisodes.FirstOrDefault(x => x.episode == e)
                                              ?? new TmdbEpisode { season = effectiveSeason, episode = e };
                                 epInfo.season = effectiveSeason;
 

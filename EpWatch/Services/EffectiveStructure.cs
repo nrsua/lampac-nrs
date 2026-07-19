@@ -14,6 +14,7 @@ public sealed class EffectiveStructure
     public List<TmdbEpisode> aired { get; private set; } = new();
     public int seasonTotal { get; private set; }
     public int seasonAired { get; private set; }
+    public List<TmdbEpisode> allEpisodes { get; private set; } = new();
 
     public static async Task<EffectiveStructure> BuildAsync(
         SubscriptionRow sub, TmdbShow show, TvdbShow tvdb, int latestSeason, string lang, CancellationToken ct)
@@ -54,6 +55,7 @@ public sealed class EffectiveStructure
             });
         }
         es.seasonAired = es.aired.Count;
+        es.allEpisodes = es.aired;
         return es;
     }
 
@@ -68,9 +70,11 @@ public sealed class EffectiveStructure
 
         var now = DateTime.UtcNow.Date;
         var seasonEps = await TmdbClient.GetSeasonAsync(show.id, es.effectiveSeason, lang, ct);
+        foreach (var e in seasonEps) e.season = es.effectiveSeason;
+        EnrichFromTvdb(seasonEps, tvdb);
+        es.allEpisodes = seasonEps;
         es.aired = seasonEps
             .Where(e => e.air_date.HasValue && e.air_date.Value.Date <= now)
-            .Select(e => { e.season = es.effectiveSeason; return e; })
             .ToList();
 
         if (es.effectiveSeason == latestSeason)
@@ -85,7 +89,6 @@ public sealed class EffectiveStructure
             es.seasonAired = es.aired.Count;
         }
 
-        EnrichFromTvdb(es.aired, tvdb);
         return es;
     }
 
@@ -153,6 +156,7 @@ public sealed class EffectiveStructure
             });
         }
         es.seasonAired = es.aired.Count;
+        es.allEpisodes = es.aired;
         return es;
     }
 
