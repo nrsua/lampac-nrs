@@ -40,6 +40,7 @@
         epwatch_settings_lang:         { uk: 'Мова інтерфейсу',                 en: 'Interface language',                  ru: 'Язык интерфейса' },
         epwatch_settings_lang_desc:    { uk: 'Мова повідомлень плагіна. «Авто» - як у Lampa.', en: 'Plugin UI language. "Auto" follows Lampa.', ru: 'Язык сообщений плагина. «Авто» - как в Lampa.' },
         epwatch_settings_open:         { uk: 'Відкрити сторінку підписок',      en: 'Open subscriptions page',             ru: 'Открыть страницу подписок' },
+        epwatch_settings_open_sched:   { uk: 'Відкрити розклад серій',          en: 'Open episode schedule',               ru: 'Открыть расписание серий' },
         epwatch_settings_link:         { uk: 'Прив’язати Telegram',             en: 'Link Telegram',                       ru: 'Привязать Telegram' },
         epwatch_settings_lang_auto:    { uk: 'Авто',                            en: 'Auto',                                ru: 'Авто' },
         epwatch_link_qr_hint:          { uk: 'Скануйте QR або відкрийте бота',  en: 'Scan the QR or open the bot',         ru: 'Сканируйте QR или откройте бота' },
@@ -69,7 +70,15 @@
         epwatch_movie_any_balancer:    { uk: 'будь-який балансир',              en: 'any balancer',                        ru: 'любой балансер' },
         epwatch_movie_any:             { uk: '🔔 Будь-який балансир',           en: '🔔 Any balancer',                    ru: '🔔 Любой балансер' },
         epwatch_movie_any_sub:         { uk: 'Коли фільм з’явиться на будь-якому балансирі', en: 'When the movie appears on any balancer', ru: 'Когда фильм появится на любом балансере' },
-        epwatch_movie_list:            { uk: 'Доступно на балансирах:',         en: 'Available on balancers:',             ru: 'Доступно на балансерах:' }
+        epwatch_movie_list:            { uk: 'Доступно на балансирах:',         en: 'Available on balancers:',             ru: 'Доступно на балансерах:' },
+
+        epwatch_calendar:              { uk: 'Календар виходу серій',            en: 'Episode release calendar',            ru: 'Календарь выхода серий' },
+        epwatch_calendar_desc:         { uk: 'Показувати внизу сторінки підписок приблизні дати виходу нових серій (за TMDB).', en: 'Show approximate upcoming episode dates at the bottom of the subscriptions page (from TMDB).', ru: 'Показывать внизу страницы подписок примерные даты выхода новых серий (по TMDB).' },
+        epwatch_sched_head:            { uk: '📅 Розклад виходу серій (за TMDB)', en: '📅 Episode schedule (via TMDB)',      ru: '📅 Расписание выхода серий (по TMDB)' },
+        epwatch_sched_menu:            { uk: 'EpW Розклад',                      en: 'EpW Schedule',                        ru: 'EpW Расписание' },
+        epwatch_sched_today:           { uk: 'сьогодні',                        en: 'today',                               ru: 'сегодня' },
+        epwatch_sched_tomorrow:        { uk: 'завтра',                          en: 'tomorrow',                            ru: 'завтра' },
+        epwatch_sched_empty:           { uk: 'Найближчих серій не заплановано',  en: 'No upcoming episodes scheduled',      ru: 'Ближайших серий не запланировано' }
     };
 
     function token() {
@@ -172,6 +181,175 @@
         '<circle cx="16" cy="11" r="1.3" stroke="currentColor" stroke-width="1.5"/>' +
         '<circle cx="12" cy="4" r="2.5" fill="currentColor"/>' +
     '</svg>';
+
+    var MENU_SCHED = 'epwatch_schedule_menu';
+
+    function calendarEnabled() {
+        try { return !!Lampa.Storage.get('epwatch_calendar', false); } catch (e) { return false; }
+    }
+
+    function esc(s) {
+        return ('' + (s || '')).replace(/[&<>"]/g, function (c) {
+            return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;';
+        });
+    }
+
+    function schedDateFull(iso) {
+        var p = ('' + iso).split('-');
+        if (p.length < 3) return iso || '';
+        var d = new Date(+p[0], +p[1] - 1, +p[2]);
+        var now = new Date(); now.setHours(0, 0, 0, 0);
+        var diff = Math.round((d.getTime() - now.getTime()) / 86400000);
+        var dd = ('0' + d.getDate()).slice(-2), mm = ('0' + (d.getMonth() + 1)).slice(-2);
+        var dow = d.getDay();
+        var wd = '';
+        try { wd = Lampa.Lang.translate('week_' + (dow === 0 ? 7 : dow)); } catch (e) {}
+        var base = (wd ? wd + ' · ' : '') + dd + '.' + mm;
+        if (diff === 0) return L('epwatch_sched_today') + ' · ' + base;
+        if (diff === 1) return L('epwatch_sched_tomorrow') + ' · ' + base;
+        return base;
+    }
+
+    function schedCardData(it) {
+        return {
+            id:            it.tmdb_id,
+            tmdb_id:       it.tmdb_id,
+            name:          it.title,
+            original_name: it.title,
+            poster_path:   it.poster_path || '',
+            source:        'tmdb'
+        };
+    }
+
+    function schedOpenShow(it) {
+        Lampa.Activity.push({
+            url: '', component: 'full',
+            id: it.tmdb_id, method: 'tv', card: schedCardData(it), source: 'tmdb'
+        });
+    }
+
+    function schedOpenDay(list) {
+        if (list.length === 1) return schedOpenShow(list[0]);
+        Lampa.Select.show({
+            title: schedDateFull(list[0].air_date),
+            items: list.map(function (it) {
+                return { title: it.title + '  ·  S' + it.season + ' E' + it.episode, sched: it };
+            }),
+            onSelect: function (a) { schedOpenShow(a.sched); },
+            onBack: function () { Lampa.Controller.toggle('content'); }
+        });
+    }
+
+    function buildScheduleDom(items) {
+        var byDate = {}, order = [];
+        items.forEach(function (it) {
+            if (!byDate[it.air_date]) { byDate[it.air_date] = []; order.push(it.air_date); }
+            byDate[it.air_date].push(it);
+        });
+        order.sort();
+
+        var wrap = $('<div class="epwatch-sched"></div>');
+        wrap.append('<div class="epwatch-sched-head">' + L('epwatch_sched_head') + '</div>');
+
+        order.forEach(function (date) {
+            var list = byDate[date];
+            var row = $('<div class="epwatch-sched-day selector' + (list[0].aired ? ' is-aired' : '') + '"></div>');
+            row.append('<div class="epwatch-sched-day-date">' + esc(schedDateFull(date)) + '</div>');
+
+            var body = $('<div class="epwatch-sched-day-list"></div>');
+            list.forEach(function (it) {
+                body.append(
+                    '<div class="epwatch-sched-ep">' +
+                        '<span class="epwatch-sched-ep-title">' + esc(it.title) + '</span> ' +
+                        '<span class="epwatch-sched-ep-se">S' + it.season + ' · E' + it.episode + '</span>' +
+                    '</div>'
+                );
+            });
+            row.append(body);
+            row.on('hover:enter', function () { schedOpenDay(list); });
+            wrap.append(row);
+        });
+
+        return wrap;
+    }
+
+    function SchedComponent(object) {
+        var comp = this;
+        var scroll = new Lampa.Scroll({ mask: true, over: true, step: 250 });
+        var html = $('<div class="epwatch-sched-page"></div>');
+        var last = false;
+
+        function setController() {
+            Lampa.Controller.add('content', {
+                toggle: function () {
+                    Lampa.Controller.collectionSet(scroll.render());
+                    Lampa.Controller.collectionFocus(last || false, scroll.render());
+                },
+                up: function () {
+                    if (Navigator.canmove('up')) Navigator.move('up');
+                    else Lampa.Controller.toggle('head');
+                },
+                down: function () { if (Navigator.canmove('down')) Navigator.move('down'); },
+                left: function () {
+                    if (Navigator.canmove('left')) Navigator.move('left');
+                    else Lampa.Controller.toggle('menu');
+                },
+                right: function () { Navigator.move('right'); },
+                back: function () { Lampa.Activity.backward(); }
+            });
+            Lampa.Controller.toggle('content');
+        }
+
+        function showEmpty() {
+            try {
+                var empty = new Lampa.Empty({ descr: L('epwatch_sched_empty') });
+                html.append(empty.render(true));
+                comp.start = empty.start.bind(empty);
+            } catch (e) {
+                html.append('<div class="epwatch-sched-page__empty">' + L('epwatch_sched_empty') + '</div>');
+            }
+            comp.activity.loader(false);
+            comp.activity.toggle();
+        }
+
+        function build(items) {
+            if (!items.length) return showEmpty();
+
+            var block = buildScheduleDom(items);
+            block.find('.epwatch-sched-day').on('hover:focus', function () {
+                last = this;
+                scroll.update($(this), true);
+            });
+
+            scroll.minus();
+            scroll.append(block);
+            html.append(scroll.render());
+
+            comp.activity.loader(false);
+            comp.activity.toggle();
+        }
+
+        comp.create = function () {
+            comp.activity.loader(true);
+            get(api('/epwatch/schedule'), function (s) {
+                build((s && s.results) || []);
+            }, function () { build([]); }, 8000);
+            return comp.render();
+        };
+
+        comp.start = function () { setController(); };
+        comp.pause = function () {};
+        comp.stop = function () {};
+        comp.render = function (js) { return js ? html[0] : html; };
+        comp.destroy = function () {
+            try { scroll.destroy(); } catch (e) {}
+            html.remove();
+        };
+    }
+
+    function openSchedulePage() {
+        Lampa.Activity.push({ url: '', title: L('epwatch_sched_menu'), component: 'epwatch_schedule', page: 1 });
+    }
 
     function tmdbImg(path) {
         if (!path) return '';
@@ -354,8 +532,51 @@
     }
 
     function addMenu() {
-        if ($('.menu__item[data-action="' + MENU_ACTION + '"]').length) return;
-        Lampa.Menu.addButton(ICON_LOGO, L('epwatch_menu'), openSubsPage).attr('data-action', MENU_ACTION);
+        if (!$('.menu__item[data-action="' + MENU_ACTION + '"]').length)
+            Lampa.Menu.addButton(ICON_LOGO, L('epwatch_menu'), openSubsPage).attr('data-action', MENU_ACTION);
+
+        if (calendarEnabled()) {
+            if (!$('.menu__item[data-action="' + MENU_SCHED + '"]').length) {
+                var $sched = Lampa.Menu.addButton(ICON_LOGO, L('epwatch_sched_menu'), openSchedulePage).attr('data-action', MENU_SCHED);
+                var $epw = $('.menu__item[data-action="' + MENU_ACTION + '"]');
+                if ($epw.length) $sched.insertAfter($epw);
+            }
+            placeSchedInMenuSort();
+        }
+    }
+
+    function placeSchedInMenuSort() {
+        try {
+            if (Lampa.Storage.get('epwatch_sched_placed', false)) return;
+
+            var epwText = L('epwatch_menu');
+            var schedText = L('epwatch_sched_menu');
+
+            var sort = Lampa.Storage.get('menu_sort', '[]');
+            if (!Array.isArray(sort) || sort.indexOf(epwText) === -1) return;
+
+            var si = sort.indexOf(schedText);
+            if (si !== -1) sort.splice(si, 1);
+            sort.splice(sort.indexOf(epwText) + 1, 0, schedText);
+
+            Lampa.Storage.set('menu_sort', sort);
+            Lampa.Storage.set('epwatch_sched_placed', true);
+
+            applyMenuSort(sort);
+        } catch (e) {}
+    }
+
+    function applyMenuSort(sort) {
+        try {
+            var $menu = $('.menu .menu__list').first();
+            if (!$menu.length) return;
+            sort.forEach(function (name) {
+                var el = $('.menu__item', $menu).filter(function () {
+                    return $(this).find('.menu__text').text().trim() === name;
+                });
+                if (el.length) el.appendTo($menu);
+            });
+        } catch (e) {}
     }
 
     function bindFullListener() {
@@ -663,7 +884,17 @@
             '.epwatch-link__scan{font-size:0.95em;opacity:0.85;max-width:30em;margin:0.8em auto 0.2em;line-height:1.4}' +
             '.epwatch-link__code{display:inline-block;margin:0.5em auto 0;padding:0.45em 0.9em;background:rgba(255,255,255,0.12);border-radius:0.4em;font-size:1.05em;font-weight:600;word-break:break-all;max-width:30em;line-height:1.5}' +
             '.card__subscribe{font-size:0.85em}' +
-            '.card__subscribe-tmdb{display:block;font-size:0.72em;opacity:0.55;margin-top:0.15em;line-height:1.1;letter-spacing:0.02em}';
+            '.card__subscribe-tmdb{display:block;font-size:0.72em;opacity:0.55;margin-top:0.15em;line-height:1.1;letter-spacing:0.02em}' +
+            '.epwatch-sched{display:block;width:100%;box-sizing:border-box;padding:0 1.5em 1em;margin-top:0.5em}' +
+            '.epwatch-sched-head{font-size:1.3em;font-weight:600;padding:0.8em 0 0.5em;opacity:0.95}' +
+            '.epwatch-sched-day{display:flex;align-items:flex-start;gap:1em;padding:0.7em 0.8em;margin-bottom:0.4em;border-radius:0.4em;background:rgba(255,255,255,0.05)}' +
+            '.epwatch-sched-day.focus{background:#fff;color:#000}' +
+            '.epwatch-sched-day-date{flex:0 0 9em;font-weight:600;color:#8fd6ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+            '.epwatch-sched-day.is-aired .epwatch-sched-day-date{color:#82d873}' +
+            '.epwatch-sched-day.focus .epwatch-sched-day-date{color:#000}' +
+            '.epwatch-sched-day-list{flex:1 1 auto;min-width:0}' +
+            '.epwatch-sched-ep{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5}' +
+            '.epwatch-sched-ep-se{opacity:0.6;font-size:0.9em}';
         var style = document.createElement('style');
         style.id = 'epwatch-styles';
         style.appendChild(document.createTextNode(css));
@@ -797,6 +1028,31 @@
 
         Lampa.SettingsApi.addParam({
             component: 'epwatch',
+            param: { name: 'epwatch_calendar', type: 'trigger', 'default': true },
+            field: {
+                name:        L('epwatch_calendar'),
+                description: L('epwatch_calendar_desc')
+            },
+            onChange: function () {
+                try {
+                    if (calendarEnabled()) addMenu();
+                    else $('.menu__item[data-action="' + MENU_SCHED + '"]').remove();
+                } catch (e) {}
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'epwatch',
+            param: { type: 'button' },
+            field:  { name: L('epwatch_settings_open_sched') },
+            onChange: function () {
+                Lampa.Controller.toggle('settings_component');
+                openSchedulePage();
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'epwatch',
             param: { name: 'epwatch_uid', type: 'input', values: '', 'default': localUid() },
             field: {
                 name:        L('epwatch_settings_uid'),
@@ -872,6 +1128,7 @@
         registerLang();
         injectStyles();
         Lampa.Component.add(MENU_ACTION, SubsComponent);
+        Lampa.Component.add('epwatch_schedule', SchedComponent);
         setTimeout(addMenu, 500);
         bindFullListener();
         addSettings();

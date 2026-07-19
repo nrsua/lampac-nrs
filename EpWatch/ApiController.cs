@@ -681,6 +681,88 @@ public class ApiController : BaseController
     }
     #endregion
 
+    #region /epwatch/schedule
+    [HttpGet]
+    [Route("epwatch/schedule")]
+    public async Task<ActionResult> Schedule()
+    {
+        var uid = Uid();
+        if (string.IsNullOrEmpty(uid))
+            return Json(new { success = true, linked = false, results = new object[0] });
+
+        using var db = SqlContext.Create();
+        var user = await db.users.AsNoTracking().FirstOrDefaultAsync(u => u.lampac_uid == uid);
+        if (user == null)
+            return Json(new { success = true, linked = false, results = new object[0] });
+
+        var lang = Strings.Normalize(user.lang);
+        var ct = HttpContext.RequestAborted;
+
+        var rows = await db.subs.AsNoTracking()
+            .Where(s => s.chat_id == user.chat_id)
+            .ToListAsync();
+
+        var seriesSubs = rows
+            .Where(s => !string.Equals(s.media_type, "movie", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var today = DateTime.UtcNow.Date;
+        var since = today.AddDays(-7);
+        var until = today.AddDays(120);
+
+        var raw = new List<(DateTime date, object item)>();
+
+        foreach (var grp in seriesSubs.GroupBy(s => s.tmdb_id))
+        {
+            if (ct.IsCancellationRequested) break;
+
+            var sub = grp.First();
+            var show = await TmdbClient.GetShowAsync(sub.tmdb_id, lang, ct);
+            if (show == null) continue;
+
+            int season = sub.target_season > 0 ? sub.target_season : show.latest_aired_season;
+            if (season <= 0) season = show.number_of_seasons;
+            if (season <= 0) continue;
+
+            var eps = await TmdbClient.GetSeasonAsync(show.id, season, lang, ct);
+            var voice = grp.Select(g => g.voice).FirstOrDefault(v => !string.IsNullOrEmpty(v)) ?? "";
+            var balancer = grp.Select(g => g.balancer).FirstOrDefault(b => !string.IsNullOrEmpty(b)) ?? "";
+
+            int added = 0;
+            foreach (var ep in eps
+                .Where(e => e.air_date.HasValue && e.air_date.Value.Date >= since && e.air_date.Value.Date <= until)
+                .OrderBy(e => e.air_date.Value))
+            {
+                raw.Add((ep.air_date.Value.Date, new
+                {
+                    tmdb_id = sub.tmdb_id,
+                    title = sub.title,
+                    poster_path = sub.poster_path,
+                    season = ep.season,
+                    episode = ep.episode,
+                    name = ep.name ?? "",
+                    still_url = ep.still_url,
+                    air_date = ep.air_date.Value.ToString("yyyy-MM-dd"),
+                    aired = ep.air_date.Value.Date <= today,
+                    voice = voice,
+                    balancer = balancer,
+                    balancer_name = BalancerProbe.DisplayName(balancer)
+                }));
+
+                if (++added >= 10) break;
+            }
+        }
+
+        var results = raw
+            .OrderBy(x => x.date)
+            .Select(x => x.item)
+            .Take(80)
+            .ToArray();
+
+        return Json(new { success = true, linked = true, results });
+    }
+    #endregion
+
     #region /epwatch/unlink
     [HttpPost, HttpGet]
     [Route("epwatch/unlink")]
