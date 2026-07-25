@@ -108,6 +108,12 @@ public static class Strings
             ["en"] = "✅ No subscriptions left.",
             ["ru"] = "✅ Подписок больше нет."
         },
+        ["btn_back"] = new()
+        {
+            ["uk"] = "◀️ Назад",
+            ["en"] = "◀️ Back",
+            ["ru"] = "◀️ Назад"
+        },
         ["list_voice_note"] = new()
         {
             ["uk"] = "озв",

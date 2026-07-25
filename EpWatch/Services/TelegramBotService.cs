@@ -248,13 +248,31 @@ public sealed class TelegramBotService : BackgroundService
         else if (data == "delmenu")
         {
             await bot.AnswerCallbackQueryAsync(id, null, ct);
-            var (text, kb) = await BuildDeleteMenu(chatId, L, ct);
-            await bot.SendMessageAsync(chatId, text, kb, Notifier.PARSE_MODE, ct);
+            await EditOrSendMenu(bot, chatId, message, await BuildDeleteMenu(chatId, L, 0, ct), ct);
+        }
+        else if (data.StartsWith("delpg_"))
+        {
+            int.TryParse(data.Substring(6), out int page);
+            await bot.AnswerCallbackQueryAsync(id, null, ct);
+            await EditOrSendMenu(bot, chatId, message, await BuildDeleteMenu(chatId, L, page, ct), ct);
+        }
+        else if (data == "delback")
+        {
+            await bot.AnswerCallbackQueryAsync(id, null, ct);
+            await EditOrSendMenu(bot, chatId, message, await BuildList(chatId, L, ct), ct);
         }
         else if (data.StartsWith("del_"))
         {
-            long.TryParse(data.Substring(4), out long subId);
-            long messageId = message?.Value<long?>("message_id") ?? 0;
+            var rest = data.Substring(4);
+            var us = rest.IndexOf('_');
+            long subId; int page = 0;
+            if (us >= 0)
+            {
+                long.TryParse(rest.Substring(0, us), out subId);
+                int.TryParse(rest.Substring(us + 1), out page);
+            }
+            else long.TryParse(rest, out subId);
+
             if (subId > 0)
             {
                 using (var db = SqlContext.Create())
@@ -267,12 +285,7 @@ public sealed class TelegramBotService : BackgroundService
                     }
                 }
                 await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_removed"), ct);
-
-                var (text, kb) = await BuildDeleteMenu(chatId, L, ct);
-                if (messageId > 0)
-                    await bot.EditMessageTextAsync(chatId, messageId, text, kb, Notifier.PARSE_MODE, ct);
-                else
-                    await bot.SendMessageAsync(chatId, text, kb, Notifier.PARSE_MODE, ct);
+                await EditOrSendMenu(bot, chatId, message, await BuildDeleteMenu(chatId, L, page, ct), ct);
                 return;
             }
             await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_notfound"), ct);
@@ -340,7 +353,23 @@ public sealed class TelegramBotService : BackgroundService
         }
     }
 
+    const int DeletePageSize = 8;
+
+    static Task EditOrSendMenu(TelegramApi bot, long chatId, JObject message, (string text, object kb) menu, CancellationToken ct)
+    {
+        long messageId = message?.Value<long?>("message_id") ?? 0;
+        if (messageId > 0)
+            return bot.EditMessageTextAsync(chatId, messageId, menu.text, menu.kb, Notifier.PARSE_MODE, ct);
+        return bot.SendMessageAsync(chatId, menu.text, menu.kb, Notifier.PARSE_MODE, ct);
+    }
+
     static async Task ShowList(TelegramApi bot, long chatId, string L, CancellationToken ct)
+    {
+        var (text, kb) = await BuildList(chatId, L, ct);
+        await bot.SendMessageAsync(chatId, text, kb, Notifier.PARSE_MODE, ct);
+    }
+
+    static async Task<(string text, object kb)> BuildList(long chatId, string L, CancellationToken ct)
     {
         using var db = SqlContext.Create();
         var list = await db.subs.AsNoTracking()
@@ -349,10 +378,7 @@ public sealed class TelegramBotService : BackgroundService
             .ToListAsync(ct);
 
         if (list.Count == 0)
-        {
-            await bot.SendMessageAsync(chatId, Strings.T(L, "list_empty"), null, Notifier.PARSE_MODE, ct);
-            return;
-        }
+            return (Strings.T(L, "list_empty"), null);
 
         var sb = new StringBuilder(Strings.T(L, "list_header"));
         foreach (var s in list)
@@ -361,10 +387,10 @@ public sealed class TelegramBotService : BackgroundService
         var kb = TgMarkup.InlineKeyboard(
             new (string, string)[] { (Strings.T(L, "btn_delete_menu"), "delmenu") }
         );
-        await bot.SendMessageAsync(chatId, sb.ToString(), kb, Notifier.PARSE_MODE, ct);
+        return (sb.ToString(), kb);
     }
 
-    static async Task<(string text, object kb)> BuildDeleteMenu(long chatId, string L, CancellationToken ct)
+    static async Task<(string text, object kb)> BuildDeleteMenu(long chatId, string L, int page, CancellationToken ct)
     {
         using var db = SqlContext.Create();
         var list = await db.subs.AsNoTracking()
@@ -375,13 +401,29 @@ public sealed class TelegramBotService : BackgroundService
         if (list.Count == 0)
             return (Strings.T(L, "delete_menu_empty"), null);
 
+        int pageCount = (list.Count + DeletePageSize - 1) / DeletePageSize;
+        if (page < 0) page = 0;
+        if (page >= pageCount) page = pageCount - 1;
+
         var voiceAny = Strings.T(L, "list_voice_any");
         var rows = new List<(string text, string data)[]>();
-        foreach (var s in list)
+        foreach (var s in list.Skip(page * DeletePageSize).Take(DeletePageSize))
         {
             var voice = string.IsNullOrEmpty(s.voice) ? voiceAny : s.voice;
-            rows.Add(new (string, string)[] { ($"❌ {s.title} · {voice}", $"del_{s.Id}") });
+            rows.Add(new (string, string)[] { ($"❌ {s.title} · {voice}", $"del_{s.Id}_{page}") });
         }
+
+        if (pageCount > 1)
+        {
+            var nav = new List<(string text, string data)>();
+            if (page > 0) nav.Add(("◀️", $"delpg_{page - 1}"));
+            nav.Add(($"{page + 1}/{pageCount}", "noop"));
+            if (page < pageCount - 1) nav.Add(("▶️", $"delpg_{page + 1}"));
+            rows.Add(nav.ToArray());
+        }
+
+        rows.Add(new (string, string)[] { (Strings.T(L, "btn_back"), "delback") });
+
         return (Strings.T(L, "delete_menu_header"), TgMarkup.InlineKeyboardFromList(rows));
     }
 
