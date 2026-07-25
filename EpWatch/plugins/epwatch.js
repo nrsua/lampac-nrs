@@ -363,7 +363,8 @@
             tmdb_id:     sub.tmdb_id,
             poster_path: sub.poster_path || '',
             source:      'tmdb',
-            epwatch:     sub
+            epwatch:     sub,
+            __epwFallback: true
         };
         if (sub.media_type === 'movie') {
             card.title          = sub.title;
@@ -463,6 +464,14 @@
                 voiceLine = '🎙 ' + voice + srcTag + balTag;
             }
 
+            var posClass = 'card__subscribe-position';
+            if (!isMovie && shownAired > 0 && element.original_name && !element.__epwFallback) {
+                try {
+                    var eh = Lampa.Utils.hash([seasonNum, seasonNum > 10 ? ':' : '', shownAired, element.original_name].join(''));
+                    posClass += Lampa.Timeline.view(eh).percent > 0 ? ' epw-seen' : ' epw-new';
+                } catch (e) {}
+            }
+
             try {
                 var $card = card.render();
                 var $view = $card.find('.card__view').first();
@@ -470,7 +479,7 @@
                     var html =
                         '<div class="card__subscribe">' +
                             '<div class="card__subscribe-status on"></div>' +
-                            '<div class="card__subscribe-position">' + position + tmdbHint + '</div>' +
+                            '<div class="' + posClass + '">' + position + tmdbHint + '</div>' +
                             '<div class="card__subscribe-voice">' + voiceLine + '</div>' +
                         '</div>';
                     $view.after(html);
@@ -884,6 +893,8 @@
             '.epwatch-link__scan{font-size:0.95em;opacity:0.85;max-width:30em;margin:0.8em auto 0.2em;line-height:1.4}' +
             '.epwatch-link__code{display:inline-block;margin:0.5em auto 0;padding:0.45em 0.9em;background:rgba(255,255,255,0.12);border-radius:0.4em;font-size:1.05em;font-weight:600;word-break:break-all;max-width:30em;line-height:1.5}' +
             '.card__subscribe{font-size:0.85em}' +
+            '.card__subscribe-position.epw-new{color:#82d873}' +
+            '.card__subscribe-position.epw-seen{color:#fff}' +
             '.card__subscribe-tmdb{display:block;font-size:0.72em;opacity:0.55;margin-top:0.15em;line-height:1.1;letter-spacing:0.02em}' +
             '.epwatch-sched{display:block;width:100%;box-sizing:border-box;padding:0 1.5em 1em;margin-top:0.5em}' +
             '.epwatch-sched-head{font-size:1.3em;font-weight:600;padding:0.8em 0 0.5em;opacity:0.95}' +
