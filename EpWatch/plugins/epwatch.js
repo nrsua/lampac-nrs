@@ -815,7 +815,7 @@
             }
 
             Lampa.Select.show({
-                title: L('epwatch_movie_pick') + ' [BETA]',
+                title: L('epwatch_movie_pick'),
                 items: items,
                 onSelect: function (a) {
                     Lampa.Controller.toggle('content');
@@ -835,7 +835,7 @@
             if (status && status.subscribed)
                 items.unshift({ title: L('epwatch_unsub'), unsubscribe: true });
             Lampa.Select.show({
-                title: L('epwatch_movie_pick') + ' [BETA]',
+                title: L('epwatch_movie_pick'),
                 items: items,
                 onSelect: function (a) {
                     Lampa.Controller.toggle('content');
