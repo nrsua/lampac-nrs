@@ -204,11 +204,11 @@ public static class Notifier
 
     public static string ProgressBar(int current, int total, int width = 10)
     {
-        if (total <= 0) return new string('░', width);
+        if (total <= 0) return new string('▱', width);
         var filled = (int)Math.Round((double)width * current / total);
         if (filled < 0) filled = 0;
         if (filled > width) filled = width;
-        return new string('▓', filled) + new string('░', width - filled);
+        return new string('▰', filled) + new string('▱', width - filled);
     }
 
     [Obsolete("Use Esc for HTML parse mode")]

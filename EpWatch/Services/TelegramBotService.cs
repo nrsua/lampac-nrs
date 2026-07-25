@@ -245,6 +245,38 @@ public sealed class TelegramBotService : BackgroundService
             }
             await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_notfound"), ct);
         }
+        else if (data == "delmenu")
+        {
+            await bot.AnswerCallbackQueryAsync(id, null, ct);
+            var (text, kb) = await BuildDeleteMenu(chatId, L, ct);
+            await bot.SendMessageAsync(chatId, text, kb, Notifier.PARSE_MODE, ct);
+        }
+        else if (data.StartsWith("del_"))
+        {
+            long.TryParse(data.Substring(4), out long subId);
+            long messageId = message?.Value<long?>("message_id") ?? 0;
+            if (subId > 0)
+            {
+                using (var db = SqlContext.Create())
+                {
+                    var sub = await db.subs.FirstOrDefaultAsync(s => s.Id == subId, ct);
+                    if (sub != null && sub.chat_id == chatId)
+                    {
+                        db.subs.Remove(sub);
+                        await db.SaveChangesAsync(ct);
+                    }
+                }
+                await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_removed"), ct);
+
+                var (text, kb) = await BuildDeleteMenu(chatId, L, ct);
+                if (messageId > 0)
+                    await bot.EditMessageTextAsync(chatId, messageId, text, kb, Notifier.PARSE_MODE, ct);
+                else
+                    await bot.SendMessageAsync(chatId, text, kb, Notifier.PARSE_MODE, ct);
+                return;
+            }
+            await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_notfound"), ct);
+        }
         else if (data.StartsWith("lang_"))
         {
             var newLang = Strings.Normalize(data.Substring(5));
@@ -323,18 +355,34 @@ public sealed class TelegramBotService : BackgroundService
         }
 
         var sb = new StringBuilder(Strings.T(L, "list_header"));
-        var rows = new List<(string text, string data)[]>();
-        var voiceAny = Strings.T(L, "list_voice_any");
+        foreach (var s in list)
+            sb.Append(FormatSubscriptionBlock(s, L)).Append('\n');
 
+        var kb = TgMarkup.InlineKeyboard(
+            new (string, string)[] { (Strings.T(L, "btn_delete_menu"), "delmenu") }
+        );
+        await bot.SendMessageAsync(chatId, sb.ToString(), kb, Notifier.PARSE_MODE, ct);
+    }
+
+    static async Task<(string text, object kb)> BuildDeleteMenu(long chatId, string L, CancellationToken ct)
+    {
+        using var db = SqlContext.Create();
+        var list = await db.subs.AsNoTracking()
+            .Where(s => s.chat_id == chatId)
+            .OrderByDescending(s => s.subscribed_at)
+            .ToListAsync(ct);
+
+        if (list.Count == 0)
+            return (Strings.T(L, "delete_menu_empty"), null);
+
+        var voiceAny = Strings.T(L, "list_voice_any");
+        var rows = new List<(string text, string data)[]>();
         foreach (var s in list)
         {
-            sb.Append(FormatSubscriptionBlock(s, L)).Append('\n');
             var voice = string.IsNullOrEmpty(s.voice) ? voiceAny : s.voice;
-            rows.Add(new (string, string)[] { ($"❌ {s.title} · {voice}", $"unsub_{s.Id}") });
+            rows.Add(new (string, string)[] { ($"❌ {s.title} · {voice}", $"del_{s.Id}") });
         }
-
-        var kb = TgMarkup.InlineKeyboardFromList(rows);
-        await bot.SendMessageAsync(chatId, sb.ToString(), kb, Notifier.PARSE_MODE, ct);
+        return (Strings.T(L, "delete_menu_header"), TgMarkup.InlineKeyboardFromList(rows));
     }
 
     static List<string> ParseSeenVoices(string seen)

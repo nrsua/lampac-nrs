@@ -90,6 +90,24 @@ public static class Strings
             ["en"] = "Any",
             ["ru"] = "Любая"
         },
+        ["btn_delete_menu"] = new()
+        {
+            ["uk"] = "🗑 Видалити підписки",
+            ["en"] = "🗑 Delete subscriptions",
+            ["ru"] = "🗑 Удалить подписки"
+        },
+        ["delete_menu_header"] = new()
+        {
+            ["uk"] = "🗑 <b>Видалення підписок</b>\n\nНатисніть, щоб видалити:",
+            ["en"] = "🗑 <b>Delete subscriptions</b>\n\nTap to remove:",
+            ["ru"] = "🗑 <b>Удаление подписок</b>\n\nНажмите, чтобы удалить:"
+        },
+        ["delete_menu_empty"] = new()
+        {
+            ["uk"] = "✅ Підписок більше немає.",
+            ["en"] = "✅ No subscriptions left.",
+            ["ru"] = "✅ Подписок больше нет."
+        },
         ["list_voice_note"] = new()
         {
             ["uk"] = "озв",
