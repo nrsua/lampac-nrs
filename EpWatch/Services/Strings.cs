@@ -281,6 +281,12 @@ public static class Strings
             ["en"] = "⏳ Wait for other voices",
             ["ru"] = "⏳ Ждать другие озвучки"
         },
+        ["movie_btn_waiting"] = new()
+        {
+            ["uk"] = "⏳ Чекаємо нові озвучення",
+            ["en"] = "⏳ Waiting for new voices",
+            ["ru"] = "⏳ Ждём новые озвучки"
+        },
         ["movie_btn_stop"] = new()
         {
             ["uk"] = "❌ Відписатися",

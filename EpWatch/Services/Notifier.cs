@@ -178,7 +178,7 @@ public static class Notifier
         return fmt.Replace("{type}", type).Replace("{id}", tmdbId.ToString());
     }
 
-    static object OpenButton(string mediaType, int tmdbId, string lang)
+    public static object OpenButton(string mediaType, int tmdbId, string lang)
     {
         if (!ModInit.conf.push_open_button) return null;
         var url = OpenUrl(mediaType, tmdbId);

@@ -334,18 +334,44 @@ public sealed class TelegramBotService : BackgroundService
                 if (sub != null && sub.chat_id == chatId)
                 {
                     var rmTitle = sub.title;
+                    var openBtn = Notifier.OpenButton(sub.media_type, sub.tmdb_id, L);
                     db.subs.Remove(sub);
                     await db.SaveChangesAsync(ct);
                     await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_removed"), ct);
+                    await SetInlineKeyboard(bot, chatId, message, openBtn != null ? TgMarkup.Inline(new[] { openBtn }) : null, ct);
                     await bot.SendMessageAsync(chatId, Strings.T(L, "movie_unsub", Notifier.Esc(rmTitle)), null, Notifier.PARSE_MODE, ct);
                     return;
                 }
             }
             await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_notfound"), ct);
+            await SetInlineKeyboard(bot, chatId, message, null, ct);
         }
         else if (data.StartsWith("mvwait_"))
         {
+            long.TryParse(data.Substring(7), out long subId);
+            SubscriptionRow sub = null;
+            if (subId > 0)
+            {
+                using var db = SqlContext.Create();
+                sub = await db.subs.AsNoTracking().FirstOrDefaultAsync(s => s.Id == subId && s.chat_id == chatId, ct);
+            }
+
+            if (sub == null)
+            {
+                await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_notfound"), ct);
+                await SetInlineKeyboard(bot, chatId, message, null, ct);
+                return;
+            }
+
             await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_waiting"), ct);
+
+            var rows = new List<object[]>
+            {
+                new[] { TgMarkup.BtnCallback(Strings.T(L, "movie_btn_waiting"), "noop") }
+            };
+            var openWaitBtn = Notifier.OpenButton(sub.media_type, sub.tmdb_id, L);
+            if (openWaitBtn != null) rows.Add(new[] { openWaitBtn });
+            await SetInlineKeyboard(bot, chatId, message, TgMarkup.Inline(rows.ToArray()), ct);
         }
         else if (data == "noop")
         {
@@ -354,6 +380,14 @@ public sealed class TelegramBotService : BackgroundService
     }
 
     const int DeletePageSize = 8;
+
+    static async Task SetInlineKeyboard(TelegramApi bot, long chatId, JObject message, object kb, CancellationToken ct)
+    {
+        long messageId = message?.Value<long?>("message_id") ?? 0;
+        if (messageId <= 0) return;
+        try { await bot.EditMessageReplyMarkupAsync(chatId, messageId, kb, ct); }
+        catch (Exception ex) { Log.Warn($"[EpWatch] keyboard edit failed: {ex.Message}"); }
+    }
 
     static Task EditOrSendMenu(TelegramApi bot, long chatId, JObject message, (string text, object kb) menu, CancellationToken ct)
     {

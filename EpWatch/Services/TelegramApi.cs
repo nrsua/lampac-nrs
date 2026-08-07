@@ -98,6 +98,14 @@ public sealed class TelegramApi
             reply_markup = replyMarkup
         }, ct);
 
+    public Task EditMessageReplyMarkupAsync(long chatId, long messageId, object replyMarkup, CancellationToken ct)
+        => CallAsync("editMessageReplyMarkup", new
+        {
+            chat_id = chatId,
+            message_id = messageId,
+            reply_markup = replyMarkup
+        }, ct);
+
     public Task SetMyCommandsAsync(object[] commands, object scope, string languageCode, CancellationToken ct)
         => CallAsync("setMyCommands", new
         {
