@@ -196,10 +196,23 @@ public static class Notifier
     static string OpenUrl(string mediaType, int tmdbId)
     {
         if (tmdbId <= 0) return "";
-        var b = BalancerProbe.HostBase()?.TrimEnd('/');
+        var b = WatchBase();
         if (string.IsNullOrWhiteSpace(b)) return "";
         var media = string.Equals(mediaType, "movie", StringComparison.OrdinalIgnoreCase) ? "movie" : "tv";
         return $"{b}/?card={tmdbId}&media={media}&source=tmdb";
+    }
+
+    static string WatchBase()
+    {
+        var watch = ModInit.conf.watch_host;
+        if (string.IsNullOrWhiteSpace(watch))
+            return BalancerProbe.HostBase()?.TrimEnd('/');
+
+        watch = watch.Trim().TrimEnd('/');
+        if (!watch.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !watch.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            watch = "https://" + watch;
+        return watch;
     }
 
     public static string ProgressBar(int current, int total, int width = 10)

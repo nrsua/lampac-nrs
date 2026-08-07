@@ -32,5 +32,7 @@ public class ModuleConf
 
     public bool push_open_button { get; set; } = false;
 
+    public string watch_host { get; set; } = "";
+
     public bool debug { get; set; } = false;
 }
