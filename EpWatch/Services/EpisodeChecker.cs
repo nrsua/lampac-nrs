@@ -183,14 +183,11 @@ public sealed class EpisodeChecker : BackgroundService
                         if (string.IsNullOrEmpty(sub.voice))
                         {
                             ep.season = effectiveSeason;
+                            toNotify.Add(ep);
                             if (aggregate)
                             {
                                 AddSummary(summary, sub, ep);
                                 notified++;
-                            }
-                            else
-                            {
-                                toNotify.Add(ep);
                             }
                         }
 
@@ -228,15 +225,12 @@ public sealed class EpisodeChecker : BackgroundService
                                              ?? es.allEpisodes.FirstOrDefault(x => x.episode == e)
                                              ?? new TmdbEpisode { season = effectiveSeason, episode = e };
                                 epInfo.season = effectiveSeason;
+                                toNotify.Add(epInfo);
 
                                 if (aggregate)
                                 {
                                     AddSummary(summary, sub, epInfo);
                                     notified++;
-                                }
-                                else
-                                {
-                                    toNotify.Add(epInfo);
                                 }
                             }
                             sub.last_voice_episode = newMax;
@@ -244,10 +238,12 @@ public sealed class EpisodeChecker : BackgroundService
                         }
                     }
 
-                    if (!aggregate && toNotify.Count > 0)
+                    if (toNotify.Count > 0)
                     {
-                        if (await Notifier.SendEpisodesBatchAsync(sub, toNotify, lang, ct))
+                        if (!aggregate && await Notifier.SendEpisodesBatchAsync(sub, toNotify, lang, ct))
                             notified += toNotify.Count;
+
+                        await NoticeFeed.AddEpisodesAsync(sub, toNotify, ct);
                     }
 
                     sub.season_total = es.seasonTotal;
@@ -338,6 +334,7 @@ public sealed class EpisodeChecker : BackgroundService
                 {
                     if (await Notifier.SendMovieAvailableAsync(sub, newItems, lang, ct))
                         notified++;
+                    await NoticeFeed.AddMovieAsync(sub, newItems, ct);
                     sub.seen_voices = string.Join("\n", seen);
                 }
 

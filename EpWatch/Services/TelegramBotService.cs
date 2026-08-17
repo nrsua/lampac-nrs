@@ -626,6 +626,8 @@ public sealed class TelegramBotService : BackgroundService
         if (user != null) db.users.Remove(user);
         var subs = await db.subs.Where(s => s.chat_id == chatId).ToListAsync(ct);
         db.subs.RemoveRange(subs);
+        var news = await db.notices.Where(n => n.chat_id == chatId).ToListAsync(ct);
+        db.notices.RemoveRange(news);
         await db.SaveChangesAsync(ct);
     }
 }

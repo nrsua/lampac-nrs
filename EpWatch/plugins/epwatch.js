@@ -9,7 +9,7 @@
 
     var META = {
         name:    'EpWatch',
-        version: '0.2.8',
+        version: '0.3.0',
         author:  'nrsua'
     };
 
@@ -78,7 +78,12 @@
         epwatch_sched_menu:            { uk: 'EpW Розклад',                      en: 'EpW Schedule',                        ru: 'EpW Расписание' },
         epwatch_sched_today:           { uk: 'сьогодні',                        en: 'today',                               ru: 'сегодня' },
         epwatch_sched_tomorrow:        { uk: 'завтра',                          en: 'tomorrow',                            ru: 'завтра' },
-        epwatch_sched_empty:           { uk: 'Найближчих серій не заплановано',  en: 'No upcoming episodes scheduled',      ru: 'Ближайших серий не запланировано' }
+        epwatch_sched_empty:           { uk: 'Найближчих серій не заплановано',  en: 'No upcoming episodes scheduled',      ru: 'Ближайших серий не запланировано' },
+
+        epwatch_notify:                { uk: 'Сповіщення в Lampa',               en: 'Notifications in Lampa',              ru: 'Уведомления в Lampa' },
+        epwatch_notify_desc:           { uk: 'Показувати нові серії у вбудованих сповіщеннях Lampa (іконка дзвіночка), окремо від Telegram.', en: 'Show new episodes in the built-in Lampa notifications (bell icon), in addition to Telegram.', ru: 'Показывать новые серии во встроенных уведомлениях Lampa (иконка колокольчика), отдельно от Telegram.' },
+        epwatch_notify_new:            { uk: 'Нова серія',                       en: 'New episode',                         ru: 'Новая серия' },
+        epwatch_notify_movie:          { uk: 'Фільм доступний',                  en: 'Movie is available',                  ru: 'Фильм доступен' }
     };
 
     function token() {
@@ -349,6 +354,121 @@
 
     function openSchedulePage() {
         Lampa.Activity.push({ url: '', title: L('epwatch_sched_menu'), component: 'epwatch_schedule', page: 1 });
+    }
+
+    var NOTICE_CLASS = 'epwatch';
+    var NOTICE_POLL_MS = 5 * 60 * 1000;
+    var noticeTarget = '';
+    var noticeTimer = null;
+
+    function noticeEnabled() {
+        try { return !!Lampa.Storage.get('epwatch_notify', true); } catch (e) { return false; }
+    }
+
+    function noticeLast() {
+        try {
+            var raw = Lampa.Storage.value ? Lampa.Storage.value('epwatch_notice_last', '')
+                                          : Lampa.Storage.get('epwatch_notice_last', '');
+            var n = parseInt(raw);
+            return isNaN(n) ? -1 : n;
+        } catch (e) { return -1; }
+    }
+
+    function noticeReady() {
+        if (noticeTarget) return true;
+        try {
+            if (!Lampa.Notice || !Lampa.Notice.classes) return false;
+            if (Lampa.NoticeClassLampa && Lampa.Notice.addClass && !Lampa.Notice.classes[NOTICE_CLASS])
+                Lampa.Notice.addClass(NOTICE_CLASS, new Lampa.NoticeClassLampa({ name: META.name, db_name: 'epwatch_notice' }));
+            noticeTarget = Lampa.Notice.classes[NOTICE_CLASS] ? NOTICE_CLASS : 'lampa';
+            return !!Lampa.Notice.classes[noticeTarget];
+        } catch (e) { return false; }
+    }
+
+    function noticeCard(it, withPoster) {
+        var card = {
+            id:          it.tmdb_id,
+            tmdb_id:     it.tmdb_id,
+            poster_path: withPoster ? (it.poster_path || '') : '',
+            source:      'tmdb'
+        };
+        if (it.media_type === 'movie') {
+            card.title          = it.title;
+            card.original_title = it.title;
+        } else {
+            card.name              = it.title;
+            card.original_name     = it.title;
+            card.number_of_seasons = it.season || 1;
+        }
+        return card;
+    }
+
+    function noticeElement(it) {
+        var labels = [];
+        var text;
+
+        if (it.kind === 'movie') {
+            text = '🎬 ' + esc(L('epwatch_notify_movie'));
+            ('' + (it.extra || '')).split('\n').forEach(function (row) {
+                if (!row) return;
+                var p = row.split('\t');
+                labels.push('🌐 ' + esc(p[0]) + (p[1] ? ' · 🎙 ' + esc(p[1]) : ''));
+            });
+        } else {
+            var se = 'S' + (it.season < 10 ? '0' : '') + it.season +
+                     'E' + (it.episode < 10 ? '0' : '') + it.episode;
+            text = '🆕 ' + esc(L('epwatch_notify_new')) + ' · ' + se + (it.name ? ' · ' + esc(it.name) : '');
+            if (it.voice) {
+                labels.push('🎙 ' + esc(it.voice));
+                if (it.balancer_name || it.balancer) labels.push('🌐 ' + esc(it.balancer_name || it.balancer));
+            }
+        }
+
+        var element = {
+            id:    'epwatch_' + it.id,
+            from:  'epwatch',
+            title: esc(it.title),
+            text:  text,
+            time:  it.time || Date.now(),
+            card:  noticeCard(it, !it.still_url)
+        };
+
+        if (labels.length) element.labels = labels;
+
+        if (it.still_url) element.img = it.still_url;
+        else if (it.poster_path) element.poster = ('' + it.poster_path).replace(/^\//, '');
+
+        return element;
+    }
+
+    function pollNotices() {
+        if (!noticeEnabled() || !noticeReady()) return;
+
+        var since = noticeLast();
+
+        get(api('/epwatch/notices?since=' + since), function (r) {
+            if (!r || !r.success || !r.linked) return;
+
+            var max = since;
+            (r.results || []).forEach(function (it) {
+                if (it.id > max) max = it.id;
+                try { Lampa.Notice.pushNotice(noticeTarget, noticeElement(it)); } catch (e) {}
+            });
+
+            if (typeof r.last_id === 'number' && r.last_id > max) max = r.last_id;
+            if (max !== since) Lampa.Storage.set('epwatch_notice_last', max);
+        }, function () {}, 10000);
+    }
+
+    function stopNoticePoll() {
+        if (noticeTimer) { clearInterval(noticeTimer); noticeTimer = null; }
+    }
+
+    function startNoticePoll() {
+        stopNoticePoll();
+        if (!noticeEnabled()) return;
+        setTimeout(pollNotices, 5000);
+        noticeTimer = setInterval(pollNotices, NOTICE_POLL_MS);
     }
 
     function tmdbImg(path) {
@@ -1039,6 +1159,16 @@
 
         Lampa.SettingsApi.addParam({
             component: 'epwatch',
+            param: { name: 'epwatch_notify', type: 'trigger', 'default': true },
+            field: {
+                name:        L('epwatch_notify'),
+                description: L('epwatch_notify_desc')
+            },
+            onChange: function () { startNoticePoll(); }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'epwatch',
             param: { name: 'epwatch_calendar', type: 'trigger', 'default': true },
             field: {
                 name:        L('epwatch_calendar'),
@@ -1143,6 +1273,7 @@
         setTimeout(addMenu, 500);
         bindFullListener();
         addSettings();
+        startNoticePoll();
         console.log('[EpWatch] plugin loaded');
     }
 

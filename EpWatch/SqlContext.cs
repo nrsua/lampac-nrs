@@ -24,7 +24,36 @@ public class SqlContext : DbContext
 
         using var db = new SqlContext();
         db.Database.EnsureCreated();
+        EnsureTables(db);
         EnsureColumns(db);
+    }
+
+    static void EnsureTables(SqlContext db)
+    {
+        try
+        {
+#pragma warning disable EF1002
+            db.Database.ExecuteSqlRaw(@"CREATE TABLE IF NOT EXISTS notices (
+                Id INTEGER NOT NULL CONSTRAINT PK_notices PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                kind TEXT NULL,
+                tmdb_id INTEGER NOT NULL DEFAULT 0,
+                media_type TEXT NULL,
+                title TEXT NULL,
+                poster_path TEXT NULL,
+                season INTEGER NOT NULL DEFAULT 0,
+                episode INTEGER NOT NULL DEFAULT 0,
+                ep_name TEXT NULL,
+                still_url TEXT NULL,
+                voice TEXT NULL,
+                balancer TEXT NULL,
+                extra TEXT NULL,
+                created_at TEXT NOT NULL
+            )");
+            db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS IX_notices_chat_id ON notices (chat_id)");
+#pragma warning restore EF1002
+        }
+        catch (Exception ex) { Log.Dbg($"[EpWatch] migrate table notices: {ex.Message}"); }
     }
 
     static void EnsureColumns(SqlContext db)
@@ -105,6 +134,7 @@ public class SqlContext : DbContext
 
     public DbSet<TgUserRow> users { get; set; }
     public DbSet<SubscriptionRow> subs { get; set; }
+    public DbSet<NoticeRow> notices { get; set; }
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -112,6 +142,7 @@ public class SqlContext : DbContext
         b.Entity<TgUserRow>().HasIndex(x => x.chat_id).IsUnique();
         b.Entity<SubscriptionRow>().HasIndex(x => new { x.chat_id, x.tmdb_id, x.voice });
         b.Entity<SubscriptionRow>().HasIndex(x => x.tmdb_id);
+        b.Entity<NoticeRow>().HasIndex(x => x.chat_id);
     }
 }
 
@@ -166,4 +197,37 @@ public class SubscriptionRow
     public DateTime? last_checked_at { get; set; }
 
     public string poster_path { get; set; }
+}
+
+[Table("notices")]
+public class NoticeRow
+{
+    [Key] public long Id { get; set; }
+
+    [Required] public long chat_id { get; set; }
+
+    public string kind { get; set; } = "episode";
+
+    public int tmdb_id { get; set; }
+
+    public string media_type { get; set; } = "tv";
+
+    public string title { get; set; } = "";
+
+    public string poster_path { get; set; } = "";
+
+    public int season { get; set; }
+    public int episode { get; set; }
+
+    public string ep_name { get; set; } = "";
+
+    public string still_url { get; set; } = "";
+
+    public string voice { get; set; } = "";
+
+    public string balancer { get; set; } = "";
+
+    public string extra { get; set; } = "";
+
+    public DateTime created_at { get; set; }
 }

@@ -763,6 +763,61 @@ public class ApiController : BaseController
     }
     #endregion
 
+    #region /epwatch/notices
+    [HttpGet]
+    [Route("epwatch/notices")]
+    public async Task<ActionResult> Notices(long since = -1, int limit = 30)
+    {
+        var uid = Uid();
+        if (string.IsNullOrEmpty(uid))
+            return Json(new { success = true, linked = false, last_id = 0, results = new object[0] });
+
+        using var db = SqlContext.Create();
+        var user = await db.users.AsNoTracking().FirstOrDefaultAsync(u => u.lampac_uid == uid);
+        if (user == null)
+            return Json(new { success = true, linked = false, last_id = 0, results = new object[0] });
+
+        long lastId = await db.notices.AsNoTracking()
+            .Where(n => n.chat_id == user.chat_id)
+            .OrderByDescending(n => n.Id)
+            .Select(n => n.Id)
+            .FirstOrDefaultAsync();
+
+        if (since < 0)
+            return Json(new { success = true, linked = true, last_id = lastId, results = new object[0] });
+
+        if (limit < 1) limit = 1;
+        if (limit > 100) limit = 100;
+
+        var rows = await db.notices.AsNoTracking()
+            .Where(n => n.chat_id == user.chat_id && n.Id > since)
+            .OrderByDescending(n => n.Id)
+            .Take(limit)
+            .ToListAsync();
+
+        var results = rows.OrderBy(n => n.Id).Select(n => new
+        {
+            id = n.Id,
+            kind = n.kind,
+            tmdb_id = n.tmdb_id,
+            media_type = n.media_type,
+            title = n.title,
+            poster_path = n.poster_path,
+            season = n.season,
+            episode = n.episode,
+            name = n.ep_name,
+            still_url = n.still_url,
+            voice = n.voice,
+            balancer = n.balancer,
+            balancer_name = BalancerProbe.DisplayName(n.balancer),
+            extra = n.extra,
+            time = new DateTimeOffset(DateTime.SpecifyKind(n.created_at, DateTimeKind.Utc)).ToUnixTimeMilliseconds()
+        }).ToArray();
+
+        return Json(new { success = true, linked = true, last_id = lastId, results });
+    }
+    #endregion
+
     #region /epwatch/unlink
     [HttpPost, HttpGet]
     [Route("epwatch/unlink")]
@@ -780,6 +835,8 @@ public class ApiController : BaseController
         db.users.Remove(user);
         var subs = await db.subs.Where(s => s.chat_id == chatId).ToListAsync();
         db.subs.RemoveRange(subs);
+        var news = await db.notices.Where(n => n.chat_id == chatId).ToListAsync();
+        db.notices.RemoveRange(news);
         await db.SaveChangesAsync();
 
         if (Notifier.Ready)
