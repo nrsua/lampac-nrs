@@ -69,6 +69,17 @@ public class BalancerEntry
     public string name { get; set; }
     public string balanser { get; set; }
     public string url { get; set; }
+    public string link { get; set; } = "";
+}
+
+public class BalancerCandidate
+{
+    public string title { get; set; }
+    public int year { get; set; }
+    public string details { get; set; }
+    public string img { get; set; }
+    public string link { get; set; }
+    public bool recommended { get; set; }
 }
 
 public class BalancerVoice

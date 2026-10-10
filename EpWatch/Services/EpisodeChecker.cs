@@ -91,6 +91,7 @@ public sealed class EpisodeChecker : BackgroundService
             .ToList();
 
         var summary = new Dictionary<long, List<string>>();
+        var probeCache = new Dictionary<string, (int maxEpisode, List<BalancerVoice> voices)>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var grp in grouped)
         {
@@ -144,15 +145,16 @@ public sealed class EpisodeChecker : BackgroundService
                     var subAuth = new AuthQs { token = subToken0, account_email = subToken0, uid = subToken0 };
 
                     var es = await EffectiveStructure.BuildAsync(sub, show, tvdb, latestSeason, lang, ct);
+                    var subBalancers = BalancerProbe.WithLink(balancers, sub.balancer, sub.balancer_link);
 
                     bool isAbsolute = string.Equals(sub.structure_source, StructureResolver.ABSOLUTE, StringComparison.OrdinalIgnoreCase);
                     if (!string.IsNullOrEmpty(sub.voice) && tvdb != null
-                        && balancers != null && balancers.Count > 0
+                        && subBalancers != null && subBalancers.Count > 0
                         && (es.effectiveSeason != sub.last_season || isAbsolute))
                     {
-                        var refBal = balancers.FirstOrDefault(b => !string.IsNullOrEmpty(sub.balancer)
+                        var refBal = subBalancers.FirstOrDefault(b => !string.IsNullOrEmpty(sub.balancer)
                                           && string.Equals(b.balanser, sub.balancer, StringComparison.OrdinalIgnoreCase))
-                                     ?? balancers.FirstOrDefault();
+                                     ?? subBalancers.FirstOrDefault();
                         var newSrc = await StructureResolver.ResolveAsync(show, tvdb, refBal, sp, subAuth, ct);
                         if (!string.Equals(newSrc, sub.structure_source ?? "", StringComparison.OrdinalIgnoreCase))
                         {
@@ -195,19 +197,24 @@ public sealed class EpisodeChecker : BackgroundService
                         changed = true;
                     }
 
-                    if (!string.IsNullOrEmpty(sub.voice) && balancers != null && balancers.Count > 0)
+                    if (!string.IsNullOrEmpty(sub.voice) && subBalancers != null && subBalancers.Count > 0)
                     {
                         int newMax = sub.last_voice_episode;
 
-                        foreach (var b in balancers)
+                        foreach (var b in subBalancers)
                         {
                             if (!string.IsNullOrEmpty(sub.balancer)
                                 && !string.Equals(sub.balancer, b.balanser, StringComparison.OrdinalIgnoreCase))
                                 continue;
 
-                            var probed = await BalancerProbe.ProbeAsync(b, sp, effectiveSeason, sub.voice, subAuth, ct);
+                            var probeKey = $"{b.balanser}|{b.link}|{tmdbId}|{effectiveSeason}|{Notifier.VoiceText(sub.voice)}";
+                            if (!probeCache.TryGetValue(probeKey, out var probed))
+                            {
+                                probed = await BalancerProbe.ProbeAsync(b, sp, effectiveSeason, sub.voice, subAuth, ct);
+                                probeCache[probeKey] = probed;
+                                if (throttle > TimeSpan.Zero) await Task.Delay(throttle, ct);
+                            }
                             if (probed.maxEpisode > newMax) newMax = probed.maxEpisode;
-                            if (throttle > TimeSpan.Zero) await Task.Delay(throttle, ct);
                         }
 
                         int seasonCap = es.seasonTotal > 0 ? es.seasonTotal : newMax;
@@ -238,6 +245,12 @@ public sealed class EpisodeChecker : BackgroundService
                         }
                     }
 
+                    if (!await StillExistsAsync(sub.Id, ct))
+                    {
+                        Log.Dbg($"[EpWatch] sub {sub.Id} removed during check - skipping");
+                        continue;
+                    }
+
                     if (toNotify.Count > 0)
                     {
                         if (!aggregate && await Notifier.SendEpisodesBatchAsync(sub, toNotify, lang, ct))
@@ -257,7 +270,7 @@ public sealed class EpisodeChecker : BackgroundService
                     if (voiceBehind)
                     {
                         var poll = TimeSpan.FromMinutes(Math.Max(5, ModInit.conf.check_interval_minutes));
-                        sub.next_check_at = now + poll + Spread(poll);
+                        sub.next_check_at = now + VoiceLagPoll(now, es, poll) + Spread(poll);
                     }
                     else
                     {
@@ -306,10 +319,13 @@ public sealed class EpisodeChecker : BackgroundService
 
                 var balancers = await BalancerProbe.GetAvailableAsync(sp, auth, ct, movie: true);
                 if (!string.IsNullOrEmpty(sub.balancer))
+                {
                     balancers = balancers.Where(b => string.Equals(b.balanser, sub.balancer, StringComparison.OrdinalIgnoreCase)).ToList();
+                    balancers = BalancerProbe.WithLink(balancers, sub.balancer, sub.balancer_link);
+                }
 
                 var seen = new HashSet<string>(
-                    (sub.seen_voices ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries),
+                    (sub.seen_voices ?? "").Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(NormalizeMovieKey),
                     StringComparer.OrdinalIgnoreCase);
                 var newItems = new List<(string balancer, string voice)>();
 
@@ -323,11 +339,17 @@ public sealed class EpisodeChecker : BackgroundService
                         var vlist = probed.voices.Count > 0 ? probed.voices : new List<string> { "" };
                         foreach (var voice in vlist)
                         {
-                            var key = b.balanser + "\t" + voice;
+                            var key = MovieKey(b.balanser, voice);
                             if (seen.Add(key)) newItems.Add((b.balanser, voice));
                         }
                     }
                     if (throttle > TimeSpan.Zero) await Task.Delay(throttle, ct);
+                }
+
+                if (!await StillExistsAsync(sub.Id, ct))
+                {
+                    Log.Dbg($"[EpWatch] movie sub {sub.Id} removed during check - skipping");
+                    continue;
                 }
 
                 if (newItems.Count > 0)
@@ -405,7 +427,7 @@ public sealed class EpisodeChecker : BackgroundService
         if (!string.IsNullOrEmpty(ep.name)) line += $" - <i>{Notifier.Esc(ep.name)}</i>";
         if (!string.IsNullOrEmpty(sub.voice))
         {
-            line += $"\n   🎙 {Notifier.Esc(sub.voice)}";
+            line += $"\n   🎙 {Notifier.Esc(Notifier.VoiceText(sub.voice))}";
             if (!string.IsNullOrEmpty(sub.balancer))
                 line += $"\n   🌐 {Notifier.Esc(BalancerProbe.DisplayName(sub.balancer))}";
         }
@@ -425,6 +447,42 @@ public sealed class EpisodeChecker : BackgroundService
             db.SaveChanges();
         }
         catch { }
+    }
+
+    static async Task<bool> StillExistsAsync(long id, CancellationToken ct)
+    {
+        try
+        {
+            using var db = SqlContext.Create();
+            return await db.subs.AsNoTracking().AnyAsync(s => s.Id == id, ct);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { return true; }
+    }
+
+    static TimeSpan VoiceLagPoll(DateTime now, EffectiveStructure es, TimeSpan poll)
+    {
+        bool seasonComplete = es.seasonTotal > 0 && es.seasonAired >= es.seasonTotal;
+        if (!seasonComplete) return poll;
+
+        var lastAir = es.aired.Where(e => e.air_date.HasValue).Select(e => e.air_date.Value).DefaultIfEmpty().Max();
+        if (lastAir == default) return poll;
+
+        var age = now - lastAir;
+        if (age >= TimeSpan.FromDays(30)) return Max(poll, TimeSpan.FromDays(7));
+        if (age >= TimeSpan.FromDays(7)) return Max(poll, TimeSpan.FromDays(1));
+        return poll;
+    }
+
+    static TimeSpan Max(TimeSpan a, TimeSpan b) => a > b ? a : b;
+
+    internal static string MovieKey(string balancer, string voice)
+        => (balancer ?? "") + "\t" + Notifier.VoiceText(voice);
+
+    static string NormalizeMovieKey(string key)
+    {
+        var tab = key.IndexOf('\t');
+        return tab < 0 ? key : MovieKey(key.Substring(0, tab), key.Substring(tab + 1));
     }
 
     static DateTime ComputeNextCheck(DateTime now, TmdbShow show)

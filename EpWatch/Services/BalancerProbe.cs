@@ -324,28 +324,29 @@ public static class BalancerProbe
         var timeoutSec = Math.Max(3, ModInit.conf.balancer_timeout_seconds);
 
         var disc = await FetchAsync(entry, sp, auth, -1, -1, timeoutSec, ct);
-        if (disc.jo == null) return new List<int>();
-
-        var tree = ExtractSeasonTree(disc.jo);
-        if (tree.Count > 0)
-            return tree.Keys.OrderBy(x => x).ToList();
-
-        return CollectMaxEpisode(disc.jo, null) > 0 ? new List<int> { 1 } : new List<int>();
+        return disc.jo == null ? new List<int>() : SeasonsOf(disc.jo);
     }
 
     public static async Task<(bool available, List<string> voices)> ProbeMovieAsync(
         BalancerEntry entry, ShowParams sp, AuthQs auth, CancellationToken ct)
     {
         var timeoutSec = Math.Max(3, ModInit.conf.balancer_timeout_seconds);
-        var qs = BuildShowQs(sp, entry.balanser, auth, movie: true) + "&rjson=true";
-        var url = AppendQs(NormalizeUrl(entry.url), qs);
 
-        var jo = await GetJsonAsync(url, timeoutSec, ct);
+        JObject jo;
+        if (!string.IsNullOrEmpty(entry.link))
+        {
+            jo = await FetchByUrlAsync(entry.link, auth, timeoutSec, ct);
+        }
+        else
+        {
+            var qs = BuildShowQs(sp, entry.balanser, auth, movie: true) + "&rjson=true";
+            jo = await GetJsonAsync(AppendQs(NormalizeUrl(entry.url), qs), timeoutSec, ct);
+        }
         if (jo == null) return (false, new List<string>());
 
         if (jo.Value<string>("type") == "similar")
         {
-            Log.Dbg($"[EpWatch] movie {entry.balanser} similar -> ignored (no exact match)");
+            Log.Dbg($"[EpWatch] movie {entry.balanser} similar -> ignored (no exact match{(string.IsNullOrEmpty(entry.link) ? "" : ", pinned")})");
             return (false, new List<string>());
         }
 
@@ -357,7 +358,7 @@ public static class BalancerProbe
         {
             foreach (var d in data)
             {
-                var tr = d.Value<string>("translate") ?? d.Value<string>("voice_name") ?? d.Value<string>("details");
+                var tr = (d.Value<string>("translate") ?? d.Value<string>("voice_name") ?? d.Value<string>("details"))?.Trim();
                 if (!string.IsNullOrWhiteSpace(tr) && seen.Add(tr)) names.Add(tr);
             }
         }
@@ -426,6 +427,15 @@ public static class BalancerProbe
 
     static async Task<(JObject jo, string url)> FetchAsync(BalancerEntry entry, ShowParams sp, AuthQs auth, int s, int t, int timeoutSec, CancellationToken ct)
     {
+        if (!string.IsNullOrEmpty(entry.link))
+        {
+            var sel = s >= 0 ? $"s={s}" : "s=-1";
+            if (t >= 0) sel += $"&t={t}";
+            var pinnedUrl = AppendQs(entry.link, sel);
+            Log.Dbg($"[EpWatch] probe {entry.balanser} s={s} pinned link");
+            return (await FetchByUrlAsync(pinnedUrl, auth, timeoutSec, ct), pinnedUrl);
+        }
+
         var qs = BuildShowQs(sp, entry.balanser, auth) + "&rjson=true";
         if (s >= 0) qs += $"&s={s}"; else qs += "&s=-1";
         if (t >= 0) qs += $"&t={t}";
@@ -497,7 +507,7 @@ public static class BalancerProbe
         {
             foreach (var vi in v)
             {
-                var name = vi.Value<string>("name");
+                var name = vi.Value<string>("name")?.Trim();
                 if (string.IsNullOrEmpty(name) || !seen.Add(name)) continue;
 
                 int t = 0;
@@ -529,13 +539,14 @@ public static class BalancerProbe
 
     static (bool found, string token, bool active) FindVoice(JObject jo, string voiceName)
     {
+        voiceName = voiceName?.Trim();
         if (string.IsNullOrEmpty(voiceName)) return (false, null, false);
         var v = jo["voice"] as JArray;
         if (v == null) return (false, null, false);
 
         foreach (var vi in v)
         {
-            var name = vi.Value<string>("name");
+            var name = vi.Value<string>("name")?.Trim();
             if (string.IsNullOrEmpty(name)) continue;
             if (!name.Equals(voiceName, StringComparison.OrdinalIgnoreCase)) continue;
 
@@ -552,6 +563,7 @@ public static class BalancerProbe
         var data = jo["data"] as JArray;
         if (data == null) return 0;
 
+        voiceName = voiceName?.Trim();
         int maxEp = 0;
         foreach (var d in data)
         {
@@ -616,32 +628,112 @@ public static class BalancerProbe
         return seasons;
     }
 
-    public static async Task<int> ProbeForVoiceAsync(BalancerEntry entry, ShowParams sp, int season, int t, AuthQs auth, CancellationToken ct)
+    public static async Task<(List<BalancerCandidate> candidates, List<int> seasons)> SearchAsync(
+        BalancerEntry entry, ShowParams sp, AuthQs auth, CancellationToken ct, bool movie = false)
     {
-        var probeUrl = NormalizeUrl(entry.url);
-        var qs = BuildShowQs(sp, entry.balanser, auth) + $"&rjson=true&s={season}&t={t}";
-        var url = AppendQs(probeUrl, qs);
-        try
+        var candidates = new List<BalancerCandidate>();
+        var seasons = new List<int>();
+        var timeoutSec = Math.Max(3, ModInit.conf.balancer_timeout_seconds);
+
+        var qs = BuildShowQs(sp, entry.balanser, auth, movie) + (movie ? "&rjson=true" : "&rjson=true&s=-1");
+        var jo = await GetJsonAsync(AppendQs(NormalizeUrl(entry.url), qs), timeoutSec, ct);
+        if (jo == null) return (candidates, seasons);
+
+        if (jo.Value<string>("type") != "similar")
         {
-            using var resp = await http.GetAsync(url, ct);
-            if (!resp.IsSuccessStatusCode) return 0;
-
-            var body = await resp.Content.ReadAsStringAsync(ct);
-            if (string.IsNullOrWhiteSpace(body) || body == "null") return 0;
-
-            var jo = JObject.Parse(body);
-            var data = jo["data"] as JArray;
-            if (data == null) return 0;
-
-            int max = 0;
-            foreach (var d in data)
-            {
-                int ep = d.Value<int?>("e") ?? 0;
-                if (ep > max) max = ep;
-            }
-            return max;
+            if (!movie) seasons = SeasonsOf(jo);
+            return (candidates, seasons);
         }
-        catch { return 0; }
+
+        var data = jo["data"] as JArray;
+        var best = PickSimilar(data, sp);
+        foreach (var d in data ?? new JArray())
+        {
+            if (d.Type != JTokenType.Object) continue;
+            var link = SanitizeLink(d.Value<string>("url"), entry.url);
+            if (link.Length == 0) continue;
+
+            var c = new BalancerCandidate
+            {
+                title = d.Value<string>("title") ?? "",
+                year = d.Value<int?>("year") ?? 0,
+                details = d.Value<string>("details") ?? "",
+                img = (d.Value<string>("img") ?? "").Replace("{localhost}", ""),
+                link = link,
+                recommended = ReferenceEquals(d, best)
+            };
+            if (c.recommended) candidates.Insert(0, c);
+            else candidates.Add(c);
+        }
+
+        Log.Dbg($"[EpWatch] search {entry.balanser} similar -> {candidates.Count} candidates");
+        return (candidates, seasons);
+    }
+
+    static List<int> SeasonsOf(JObject jo)
+    {
+        var tree = ExtractSeasonTree(jo);
+        if (tree.Count > 0) return tree.Keys.OrderBy(x => x).ToList();
+        return CollectMaxEpisode(jo, null) > 0 ? new List<int> { 1 } : new List<int>();
+    }
+
+    public static List<BalancerEntry> WithLink(List<BalancerEntry> list, string balancer, string link)
+    {
+        if (list == null || string.IsNullOrEmpty(balancer) || string.IsNullOrEmpty(link)) return list;
+        return list.Select(b => string.Equals(b.balanser, balancer, StringComparison.OrdinalIgnoreCase)
+                ? new BalancerEntry { name = b.name, balanser = b.balanser, url = b.url, link = link }
+                : b)
+            .ToList();
+    }
+
+    static readonly HashSet<string> _linkDropKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "token", "account_email", "uid", "box_mac", "s", "t", "rjson"
+    };
+
+    public static string SanitizeLink(string link, string entryUrl)
+    {
+        if (string.IsNullOrWhiteSpace(link) || link.Length > 2048) return "";
+        link = link.Trim().Replace("{localhost}", "");
+
+        string pathQuery;
+        if (link.StartsWith("//")) link = "http:" + link;
+        if (link.StartsWith("/"))
+            pathQuery = link;
+        else if (Uri.TryCreate(link, UriKind.Absolute, out var abs)
+                 && (abs.Scheme == Uri.UriSchemeHttp || abs.Scheme == Uri.UriSchemeHttps))
+            pathQuery = abs.PathAndQuery;
+        else
+            return "";
+
+        var seg = LiteSegment(pathQuery);
+        if (seg.Length == 0 || pathQuery.Contains("..")) return "";
+
+        var entrySeg = LiteSegment(NormalizeUrl(entryUrl ?? ""));
+        if (entrySeg.Length > 0 && !string.Equals(seg, entrySeg, StringComparison.OrdinalIgnoreCase)) return "";
+
+        var q = pathQuery.IndexOf('?');
+        if (q < 0) return pathQuery;
+
+        var kept = pathQuery.Substring(q + 1)
+            .Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Where(p =>
+            {
+                var eq = p.IndexOf('=');
+                var key = eq >= 0 ? p.Substring(0, eq) : p;
+                return !_linkDropKeys.Contains(key);
+            })
+            .ToList();
+
+        var path = pathQuery.Substring(0, q);
+        return kept.Count > 0 ? path + "?" + string.Join("&", kept) : path;
+    }
+
+    static string LiteSegment(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return "";
+        var m = Regex.Match(url, @"^(?:https?://[^/]+)?/lite/([A-Za-z0-9_\-]+)(?:[/?]|$)", RegexOptions.IgnoreCase);
+        return m.Success ? m.Groups[1].Value : "";
     }
 
     static readonly HashSet<string> _clarificationBalancers = new(StringComparer.OrdinalIgnoreCase)

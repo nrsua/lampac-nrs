@@ -55,6 +55,7 @@ public sealed class TelegramBotService : BackgroundService
         var baseErrDelay = TimeSpan.FromSeconds(5);
         var maxErrDelay = TimeSpan.FromSeconds(60);
         var errDelay = baseErrDelay;
+        var lastConflictLog = DateTime.MinValue;
 
         while (!ct.IsCancellationRequested)
         {
@@ -68,7 +69,12 @@ public sealed class TelegramBotService : BackgroundService
             catch (Exception ex)
             {
                 var reason = ex is OperationCanceledException ? "timeout/no network" : ex.Message;
-                Log.Warn($"[EpWatch] getUpdates: {reason} - retry in {errDelay.TotalSeconds:F0}s");
+                bool conflict = reason.StartsWith("409");
+                if (!conflict || DateTime.UtcNow - lastConflictLog > TimeSpan.FromMinutes(30))
+                {
+                    Log.Warn($"[EpWatch] getUpdates: {reason} - retry in {errDelay.TotalSeconds:F0}s");
+                    if (conflict) lastConflictLog = DateTime.UtcNow;
+                }
                 try { await Task.Delay(errDelay, ct); } catch { break; }
                 errDelay = TimeSpan.FromSeconds(Math.Min(maxErrDelay.TotalSeconds, errDelay.TotalSeconds * 2));
                 continue;
@@ -230,7 +236,7 @@ public sealed class TelegramBotService : BackgroundService
                 if (sub != null && sub.chat_id == chatId)
                 {
                     var rmTitle = sub.title;
-                    var rmVoice = sub.voice;
+                    var rmVoice = Notifier.VoiceText(sub.voice);
                     db.subs.Remove(sub);
                     await db.SaveChangesAsync(ct);
                     await bot.AnswerCallbackQueryAsync(id, Strings.T(L, "cb_removed"), ct);
@@ -443,7 +449,7 @@ public sealed class TelegramBotService : BackgroundService
         var rows = new List<(string text, string data)[]>();
         foreach (var s in list.Skip(page * DeletePageSize).Take(DeletePageSize))
         {
-            var voice = string.IsNullOrEmpty(s.voice) ? voiceAny : s.voice;
+            var voice = string.IsNullOrWhiteSpace(s.voice) ? voiceAny : Notifier.VoiceText(s.voice);
             rows.Add(new (string, string)[] { ($"❌ {s.title} · {voice}", $"del_{s.Id}_{page}") });
         }
 
@@ -509,7 +515,7 @@ public sealed class TelegramBotService : BackgroundService
         }
 
         var voiceAny = Strings.T(L, "list_voice_any");
-        var voice = string.IsNullOrEmpty(s.voice) ? voiceAny : s.voice;
+        var voice = string.IsNullOrWhiteSpace(s.voice) ? voiceAny : Notifier.VoiceText(s.voice);
         var seasonNum = s.target_season > 0 ? s.target_season : s.last_season;
 
         bool hasVoice = !string.IsNullOrEmpty(s.voice);

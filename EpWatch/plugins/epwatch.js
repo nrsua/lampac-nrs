@@ -9,30 +9,38 @@
 
     var META = {
         name:    'EpWatch',
-        version: '0.3.0',
+        version: '0.4.0',
         author:  'nrsua'
     };
 
     var DICT = {
-        epwatch_menu:            { uk: 'EpWatch',                               en: 'EpWatch',                             ru: 'EpWatch' },
-        epwatch_unavailable:     { uk: 'EpWatch недоступний',                   en: 'EpWatch is unavailable',              ru: 'EpWatch недоступен' },
-        epwatch_link_title:      { uk: 'Прив’яжіть Telegram',                   en: 'Link Telegram',                       ru: 'Привяжите Telegram' },
-        epwatch_link_open_bot:   { uk: 'Відкрити бота',                         en: 'Open the bot',                        ru: 'Открыть бота' },
-        epwatch_link_show:       { uk: 'Показати посилання',                    en: 'Show the link',                       ru: 'Показать ссылку' },
-        epwatch_bot_offline:     { uk: 'Бот не запущено',                       en: 'The bot is offline',                  ru: 'Бот не запущен' },
-        epwatch_title:           { uk: 'TG-сповіщення',                         en: 'TG notifications',                    ru: 'TG-уведомления' },
-        epwatch_voice_any:       { uk: '🔔 Будь-яке озвучення',                 en: '🔔 Any voice‑over',                  ru: '🔔 Любая озвучка' },
-        epwatch_voice_any_sub:   { uk: 'Коли вийде серія (за TMDB)',            en: 'When the episode airs (TMDB)',        ru: 'При выходе серии (по TMDB)' },
-        epwatch_voice_list:      { uk: 'Озвучення на балансирах:',              en: 'Voice‑overs on balancers:',           ru: 'Озвучки на балансирах:' },
-        epwatch_subscribe_only:  { uk: '🔔 Підписатися (без озвучення)',        en: '🔔 Subscribe (no voice‑over)',       ru: '🔔 Подписаться (без озвучки)' },
-        epwatch_unsub:           { uk: '❌ Відписатися',                        en: '❌ Unsubscribe',                     ru: '❌ Отписаться' },
-        epwatch_unsub_prefix:    { uk: '❌ Відписатися: ',                      en: '❌ Unsubscribe: ',                   ru: '❌ Отписаться: ' },
-        epwatch_subscribed:      { uk: '🔔 Підписку оформлено',                 en: '🔔 Subscribed',                      ru: '🔔 Подписка оформлена' },
-        epwatch_subscribed_v:    { uk: '🔔 Підписка: ',                         en: '🔔 Subscribed: ',                    ru: '🔔 Подписка: ' },
-        epwatch_unsubscribed:    { uk: 'Підписку скасовано',                    en: 'Subscription removed',                ru: 'Подписка отменена' },
-        epwatch_err_network:     { uk: 'Мережева помилка',                      en: 'Network error',                       ru: 'Сетевая ошибка' },
-        epwatch_err_unknown:     { uk: 'Помилка',                               en: 'Error',                               ru: 'Ошибка' },
-        epwatch_voice_any_word:  { uk: 'Будь-яка',                              en: 'Any',                                 ru: 'Любая' },
+        epwatch_menu:                   { uk: 'EpWatch',                               en: 'EpWatch',                             ru: 'EpWatch' },
+        epwatch_unavailable:            { uk: 'EpWatch недоступний',                   en: 'EpWatch is unavailable',              ru: 'EpWatch недоступен' },
+        epwatch_link_title:             { uk: 'Прив’яжіть Telegram',                   en: 'Link Telegram',                       ru: 'Привяжите Telegram' },
+        epwatch_link_open_bot:          { uk: 'Відкрити бота',                         en: 'Open the bot',                        ru: 'Открыть бота' },
+        epwatch_link_show:              { uk: 'Показати посилання',                    en: 'Show the link',                       ru: 'Показать ссылку' },
+        epwatch_bot_offline:            { uk: 'Бот не запущено',                       en: 'The bot is offline',                  ru: 'Бот не запущен' },
+        epwatch_title:                  { uk: 'TG-сповіщення',                         en: 'TG notifications',                    ru: 'TG-уведомления' },
+        epwatch_voice_any:              { uk: '🔔 Будь-яке озвучення',                 en: '🔔 Any voice‑over',                  ru: '🔔 Любая озвучка' },
+        epwatch_voice_any_sub:          { uk: 'Коли вийде серія (за TMDB)',            en: 'When the episode airs (TMDB)',        ru: 'При выходе серии (по TMDB)' },
+        epwatch_voice_list:             { uk: 'Озвучення на балансирах:',              en: 'Voice‑overs on balancers:',           ru: 'Озвучки на балансирах:' },
+        epwatch_subscribe_only:         { uk: '🔔 Підписатися (без озвучення)',        en: '🔔 Subscribe (no voice‑over)',       ru: '🔔 Подписаться (без озвучки)' },
+        epwatch_unsub:                  { uk: '❌ Відписатися',                        en: '❌ Unsubscribe',                     ru: '❌ Отписаться' },
+        epwatch_unsub_prefix:           { uk: '❌ Відписатися: ',                      en: '❌ Unsubscribe: ',                   ru: '❌ Отписаться: ' },
+        epwatch_subscribed:             { uk: '🔔 Підписку оформлено',                 en: '🔔 Subscribed',                      ru: '🔔 Подписка оформлена' },
+        epwatch_subscribed_v:           { uk: '🔔 Підписка: ',                         en: '🔔 Subscribed: ',                    ru: '🔔 Подписка: ' },
+        epwatch_unsubscribed:           { uk: 'Підписку скасовано',                    en: 'Subscription removed',                ru: 'Подписка отменена' },
+        epwatch_err_network:            { uk: 'Мережева помилка',                      en: 'Network error',                       ru: 'Сетевая ошибка' },
+        epwatch_err_unknown:            { uk: 'Помилка',                               en: 'Error',                               ru: 'Ошибка' },
+        epwatch_voice_any_word:         { uk: 'Будь-яка',                              en: 'Any',                                 ru: 'Любая' },
+        epwatch_pick_balancer:          { uk: 'Або оберіть балансир:',                 en: 'Or pick a balancer:',                 ru: 'Или выберите балансер:' },
+        epwatch_pick_show:              { uk: 'Оберіть потрібний серіал',              en: 'Pick the right show',                 ru: 'Выберите нужный сериал' },
+        epwatch_pick_movie:             { uk: 'Оберіть потрібний фільм',               en: 'Pick the right movie',                ru: 'Выберите нужный фильм' },
+        epwatch_movie_wait_exact:       { uk: '⏳ Немає потрібного - чекати точного збігу', en: '⏳ Not listed - wait for an exact match', ru: '⏳ Нет нужного - ждать точного совпадения' },
+        epwatch_movie_wait_exact_sub:   { uk: 'Сповістимо, коли балансир знайде саме цей фільм', en: 'We will notify you when the balancer finds this exact movie', ru: 'Сообщим, когда балансер найдёт именно этот фильм' },
+        epwatch_cand_ref:               { uk: 'Картка, з якої підписуєтесь (TMDB)',    en: 'The card you subscribe from (TMDB)',  ru: 'Карточка, с которой подписываетесь (TMDB)' },
+        epwatch_bal_seasons:            { uk: 'сезони:',                               en: 'seasons:',                            ru: 'сезоны:' },
+        epwatch_bal_no_voices:          { uk: 'На цьому балансирі озвучень не знайдено', en: 'No voice‑overs found on this balancer', ru: 'На этом балансере озвучек не найдено' },
 
         epwatch_settings_about:        { uk: 'Про додаток',                     en: 'About',                               ru: 'О плагине' },
         epwatch_settings_author:       { uk: 'Автор',                           en: 'Author',                              ru: 'Автор' },
@@ -362,7 +370,7 @@
     var noticeTimer = null;
 
     function noticeEnabled() {
-        try { return !!Lampa.Storage.get('epwatch_notify', true); } catch (e) { return false; }
+        try { return !!Lampa.Storage.get('epwatch_notify', false); } catch (e) { return false; }
     }
 
     function noticeLast() {
@@ -567,7 +575,7 @@
                 position = '🎬 ' + (sub.seen_voices ? '✅' : '⏳');
                 voiceLine = sub.balancer_name || sub.balancer || L('epwatch_movie_any_balancer');
             } else {
-                var voice = sub.voice || anyWord;
+                var voice = ('' + (sub.voice || '')).trim() || anyWord;
                 var srcTag = sub.structure_source === 'tvdb' ? ' · TVDB'
                            : sub.structure_source === 'absolute' ? ' · ABS' : '';
                 var seasonNum = sub.target_season && sub.target_season > 0 ? sub.target_season : sub.last_season;
@@ -748,84 +756,200 @@
         });
     }
 
+    function unsubItems(status, anyWord) {
+        var items = [];
+        if (!status || !status.subscribed) return items;
+        if (status.items && status.items.length) {
+            status.items.forEach(function (it) {
+                var label = it.voice || anyWord;
+                var bn = it.balancer_name || it.balancer;
+                if (it.voice && bn) label += ' · ' + bn;
+                items.push({ title: L('epwatch_unsub_prefix') + label, unsubscribe: true, subId: it.id });
+            });
+        } else if (status.voices && status.voices.length) {
+            status.voices.forEach(function (v) {
+                items.push({ title: L('epwatch_unsub_prefix') + (('' + (v || '')).trim() || anyWord), unsubscribe: true, voice: v });
+            });
+        } else {
+            items.push({ title: L('epwatch_unsub'), unsubscribe: true, voice: null });
+        }
+        return items;
+    }
+
     function showVoiceMenu(card, $btn, status, onChanged) {
         var title  = card.name || card.title || '';
         var year   = card.first_air_date ? parseInt(card.first_air_date) : (card.year || 0);
         var tmdbId = card.id || 0;
         var anyWord = L('epwatch_voice_any_word');
+        var showQs = 'tmdb_id=' + tmdbId + '&title=' + encodeURIComponent(title) + '&year=' + year;
+        var ctx = { card: card, $btn: $btn, onChanged: onChanged, showQs: showQs, season: card.number_of_seasons || 1 };
+        var rootItems = [];
+
+        function showRoot() {
+            Lampa.Select.show({
+                title: L('epwatch_title'),
+                items: rootItems,
+                onSelect: function (a) {
+                    Lampa.Controller.toggle('content');
+                    if (a.unsubscribe) doUnsub(card, $btn, a.voice, onChanged, a.subId);
+                    else if (a.any) pickSeasonAndSubscribe(card, '', '', ctx.season, $btn, onChanged, '');
+                    else showBalancerVoices(ctx, a.balancer, a.balancerName, '');
+                },
+                onBack: function () { Lampa.Controller.toggle('content'); }
+            });
+        }
+        ctx.back = showRoot;
 
         Lampa.Loading.start(function () { Lampa.Loading.stop(); });
 
-        get(api('/epwatch/voices?tmdb_id=' + tmdbId + '&title=' + encodeURIComponent(title) + '&year=' + year),
+        get(api('/epwatch/balancers?serial=1&' + showQs),
         function (r) {
             Lampa.Loading.stop();
-            var season = (r && r.season) || card.number_of_seasons || 1;
-            var items  = [];
+            if (r && r.season) ctx.season = r.season;
 
-            if (status && status.subscribed) {
-                if (status.voices && status.voices.length) {
-                    status.voices.forEach(function (v) {
-                        items.push({ title: L('epwatch_unsub_prefix') + (v || anyWord), unsubscribe: true, voice: v });
-                    });
-                } else {
-                    items.push({ title: L('epwatch_unsub'), unsubscribe: true, voice: null });
-                }
-                items.push({ title: '', separator: true });
-            }
+            rootItems = unsubItems(status, anyWord);
+            if (rootItems.length) rootItems.push({ title: '', separator: true });
 
-            items.push({
-                title:    L('epwatch_voice_any'),
-                subtitle: L('epwatch_voice_any_sub'),
-                voice: '', balancer: ''
-            });
+            rootItems.push({ title: L('epwatch_voice_any'), subtitle: L('epwatch_voice_any_sub'), any: true });
 
-            if (r && r.voices && r.voices.length) {
-                items.push({ title: L('epwatch_voice_list'), separator: true });
-                r.voices.forEach(function (v) {
-                    items.push({
-                        title:    '🎙 ' + v.name,
-                        subtitle: v.balancer ? '[' + v.balancer + ']' : '',
-                        voice:    v.name,
-                        balancer: v.balancer || ''
+            if (r && r.balancers && r.balancers.length) {
+                rootItems.push({ title: L('epwatch_pick_balancer'), separator: true });
+                r.balancers.forEach(function (b) {
+                    rootItems.push({
+                        title:        '🌐 ' + (b.name || b.balancer),
+                        balancer:     b.balancer,
+                        balancerName: b.name || b.balancer
                     });
                 });
             }
 
-            Lampa.Select.show({
-                title: L('epwatch_title'),
-                items: items,
-                onSelect: function (a) {
-                    Lampa.Controller.toggle('content');
-                    if (a.unsubscribe) doUnsub(card, $btn, a.voice, onChanged);
-                    else pickSeasonAndSubscribe(card, a.voice, a.balancer, season, $btn, onChanged);
-                },
-                onBack: function () { Lampa.Controller.toggle('content'); }
-            });
+            showRoot();
         },
         function () {
             Lampa.Loading.stop();
-            var items = [{ title: L('epwatch_subscribe_only'), voice: '', balancer: '' }];
-            if (status && status.subscribed) items.unshift({ title: L('epwatch_unsub'), unsubscribe: true, voice: null });
+            rootItems = unsubItems(status, anyWord);
+            rootItems.push({ title: L('epwatch_subscribe_only'), any: true });
+            showRoot();
+        }, 30000);
+    }
+
+    function showBalancerVoices(ctx, balancer, balancerName, link) {
+        Lampa.Loading.start(function () { Lampa.Loading.stop(); });
+
+        var url = '/epwatch/voices?' + ctx.showQs + '&balancer=' + encodeURIComponent(balancer) +
+                  (link ? '&link=' + encodeURIComponent(link) : '');
+
+        get(api(url), function (r) {
+            Lampa.Loading.stop();
+            if (!r || !r.success) {
+                Lampa.Noty.show(L('epwatch_err_unknown') + ': ' + ((r && r.msg) || ''));
+                return ctx.back();
+            }
+            if (r.season) ctx.season = r.season;
+
+            if (r.candidates && r.candidates.length) {
+                if (r.candidates.length === 1) return showBalancerVoices(ctx, balancer, balancerName, r.candidates[0].link);
+                return pickCandidate(ctx, balancerName, r.candidates, function (lnk) {
+                    showBalancerVoices(ctx, balancer, balancerName, lnk);
+                });
+            }
+
+            var voices = (r.voices || []).filter(function (v) { return v && ('' + (v.name || '')).trim(); });
+            if (!voices.length) {
+                Lampa.Noty.show(L('epwatch_bal_no_voices'));
+                return ctx.back();
+            }
+
+            var head = (r.balancer_name || balancerName) +
+                       (r.seasons && r.seasons.length ? ' · ' + L('epwatch_bal_seasons') + ' ' + r.seasons.join(', ') : '');
+
             Lampa.Select.show({
-                title: L('epwatch_title'), items: items,
+                title: head,
+                items: voices.map(function (v) {
+                    var name = ('' + v.name).trim();
+                    return { title: '🎙 ' + esc(name), voice: name };
+                }),
                 onSelect: function (a) {
                     Lampa.Controller.toggle('content');
-                    if (a.unsubscribe) doUnsub(card, $btn, a.voice, onChanged);
-                    else pickSeasonAndSubscribe(card, '', '', card.number_of_seasons || 1, $btn, onChanged);
+                    pickSeasonAndSubscribe(ctx.card, a.voice, balancer, ctx.season, ctx.$btn, ctx.onChanged, r.link || '');
                 },
-                onBack: function () { Lampa.Controller.toggle('content'); }
+                onBack: ctx.back
             });
+        }, function () {
+            Lampa.Loading.stop();
+            Lampa.Noty.show(L('epwatch_err_network'));
         }, 60000);
     }
 
-    function pickSeasonAndSubscribe(card, voice, balancer, fallbackSeason, $btn, onChanged) {
+    function balImg(src) {
+        src = '' + (src || '');
+        if (/^https?:\/\//i.test(src)) return src;
+        if (src.indexOf('//') === 0) return location.protocol + src;
+        if (src.charAt(0) === '/') return HOST + src;
+        return '';
+    }
+
+    function posterItem(item, src) {
+        if (src) item.thumbnail = src.replace(/"/g, '%22');
+        else {
+            item.template = 'selectbox_icon';
+            item.icon = '<div class="epw-poster"></div>';
+        }
+        return item;
+    }
+
+    function pickCandidate(ctx, balancerName, list, onPick, extra) {
+        var card = ctx.card;
+        var refYear = ('' + (card.first_air_date || card.release_date || '')).slice(0, 4);
+        var head = L(ctx.pickKey || 'epwatch_pick_show') + ' · ' + balancerName;
+
+        var items = [posterItem({
+            title:    esc(card.name || card.title || '') + (refYear ? ' (' + refYear + ')' : ''),
+            subtitle: L('epwatch_cand_ref'),
+            noenter:  true
+        }, tmdbImg(card.poster_path))];
+
+        items.push({ title: '🌐 ' + balancerName, separator: true });
+
+        list.forEach(function (c, i) {
+            items.push(posterItem({
+                title:    (c.recommended ? '★ ' : '') + esc(c.title || '?') + (c.year ? ' (' + c.year + ')' : ''),
+                subtitle: esc(c.details || ''),
+                link:     c.link,
+                selected: i === 0
+            }, balImg(c.img)));
+        });
+
+        if (extra) items.push({ title: extra.title, subtitle: extra.subtitle || '', extra: true });
+
+        Lampa.Select.show({
+            title: head,
+            items: items,
+            nomark: true,
+            onDraw: function (item) {
+                item.addClass('epw-cand');
+                var img = item.find('.selectbox-item__icon img');
+                if (!img.length) return;
+                img.removeClass('size-youtube').addClass('epw-poster').attr('alt', '');
+                img.on('error', function () { $(this).css('opacity', 0); });
+            },
+            onSelect: function (a) {
+                if (!a.link && !a.extra) return;
+                Lampa.Controller.toggle('content');
+                onPick(a.extra ? '' : a.link);
+            },
+            onBack: ctx.back
+        });
+    }
+
+    function pickSeasonAndSubscribe(card, voice, balancer, fallbackSeason, $btn, onChanged, link) {
         Lampa.Loading.start(function () { Lampa.Loading.stop(); });
 
         get(api('/epwatch/seasons?tmdb_id=' + card.id),
         function (r) {
             Lampa.Loading.stop();
             if (!r || !r.success || !r.seasons || !r.seasons.length) {
-                doSub(card, voice, balancer, fallbackSeason, 0, $btn, onChanged);
+                doSub(card, voice, balancer, fallbackSeason, 0, $btn, onChanged, link);
                 return;
             }
 
@@ -855,23 +979,24 @@
                 onSelect: function (a) {
                     Lampa.Controller.toggle('content');
                     var initSeason = a.target > 0 ? a.target : (r.latest_aired_season || fallbackSeason);
-                    doSub(card, voice, balancer, initSeason, a.target, $btn, onChanged);
+                    doSub(card, voice, balancer, initSeason, a.target, $btn, onChanged, link);
                 },
                 onBack: function () { Lampa.Controller.toggle('content'); }
             });
         },
         function () {
             Lampa.Loading.stop();
-            doSub(card, voice, balancer, fallbackSeason, 0, $btn, onChanged);
+            doSub(card, voice, balancer, fallbackSeason, 0, $btn, onChanged, link);
         });
     }
 
-    function doSub(card, voice, balancer, season, targetSeason, $btn, onChanged) {
+    function doSub(card, voice, balancer, season, targetSeason, $btn, onChanged, link) {
         var payload = {
             tmdb_id:       card.id,
             title:         card.name || card.title || '',
             voice:         voice || '',
             balancer:      balancer || '',
+            link:          link || '',
             poster_path:   card.poster_path || '',
             season:        season,
             episode:       0,
@@ -892,9 +1017,10 @@
         }, function () { Lampa.Loading.stop(); Lampa.Noty.show(L('epwatch_err_network')); }, 90000);
     }
 
-    function doUnsub(card, $btn, voice, onChanged) {
+    function doUnsub(card, $btn, voice, onChanged, subId) {
         var body = { tmdb_id: card.id };
-        if (voice !== null && typeof voice !== 'undefined') body.voice = voice;
+        if (subId) body.id = subId;
+        else if (voice !== null && typeof voice !== 'undefined') body.voice = voice;
         post(api('/epwatch/unsubscribe'), body, function (r) {
             if (r && r.success) {
                 Lampa.Noty.show(L('epwatch_unsubscribed'));
@@ -910,69 +1036,83 @@
         var title  = card.title || card.name || '';
         var year   = card.release_date ? parseInt(card.release_date) : (card.year || 0);
         var tmdbId = card.id || 0;
+        var showQs = 'tmdb_id=' + tmdbId + '&title=' + encodeURIComponent(title) + '&year=' + year;
+        var ctx = { card: card, $btn: $btn, onChanged: onChanged, showQs: showQs, pickKey: 'epwatch_pick_movie' };
+        var rootItems = [];
+
+        function showRoot() {
+            Lampa.Select.show({
+                title: L('epwatch_movie_pick'),
+                items: rootItems,
+                onSelect: function (a) {
+                    Lampa.Controller.toggle('content');
+                    if (a.unsubscribe) return doUnsub(card, $btn, null, onChanged);
+                    if (!a.balancer) return doMovieSub(card, '', $btn, onChanged, '');
+                    movieProbe(ctx, a.balancer, a.balancerName);
+                },
+                onBack: function () { Lampa.Controller.toggle('content'); }
+            });
+        }
+        ctx.back = showRoot;
+
+        function baseItems() {
+            var items = [];
+            if (status && status.subscribed) items.push({ title: L('epwatch_unsub'), unsubscribe: true });
+            items.push({ title: L('epwatch_movie_any'), subtitle: L('epwatch_movie_any_sub'), balancer: '' });
+            return items;
+        }
 
         Lampa.Loading.start(function () { Lampa.Loading.stop(); });
 
-        get(api('/epwatch/balancers?tmdb_id=' + tmdbId + '&title=' + encodeURIComponent(title) + '&year=' + year),
+        get(api('/epwatch/balancers?' + showQs),
         function (r) {
             Lampa.Loading.stop();
-            var items = [];
-
-            if (status && status.subscribed)
-                items.push({ title: L('epwatch_unsub'), unsubscribe: true });
-
-            items.push({
-                title:    L('epwatch_movie_any'),
-                subtitle: L('epwatch_movie_any_sub'),
-                balancer: ''
-            });
-
+            rootItems = baseItems();
             if (r && r.balancers && r.balancers.length) {
-                items.push({ title: L('epwatch_movie_list'), separator: true });
+                rootItems.push({ title: L('epwatch_movie_list'), separator: true });
                 r.balancers.forEach(function (b) {
-                    items.push({ title: '🌐 ' + (b.name || b.balancer), balancer: b.balancer });
+                    rootItems.push({ title: '🌐 ' + (b.name || b.balancer), balancer: b.balancer, balancerName: b.name || b.balancer });
                 });
             }
-
-            Lampa.Select.show({
-                title: L('epwatch_movie_pick'),
-                items: items,
-                onSelect: function (a) {
-                    Lampa.Controller.toggle('content');
-                    if (a.unsubscribe) return doUnsub(card, $btn, null, onChanged);
-                    doMovieSub(card, a.balancer, $btn, onChanged);
-                },
-                onBack: function () { Lampa.Controller.toggle('content'); }
-            });
+            showRoot();
         },
         function () {
             Lampa.Loading.stop();
-            var items = [{
-                title:    L('epwatch_movie_any'),
-                subtitle: L('epwatch_movie_any_sub'),
-                balancer: ''
-            }];
-            if (status && status.subscribed)
-                items.unshift({ title: L('epwatch_unsub'), unsubscribe: true });
-            Lampa.Select.show({
-                title: L('epwatch_movie_pick'),
-                items: items,
-                onSelect: function (a) {
-                    Lampa.Controller.toggle('content');
-                    if (a.unsubscribe) return doUnsub(card, $btn, null, onChanged);
-                    doMovieSub(card, a.balancer, $btn, onChanged);
-                },
-                onBack: function () { Lampa.Controller.toggle('content'); }
-            });
+            rootItems = baseItems();
+            showRoot();
         }, 60000);
     }
 
-    function doMovieSub(card, balancer, $btn, onChanged) {
+    function movieProbe(ctx, balancer, balancerName) {
+        Lampa.Loading.start(function () { Lampa.Loading.stop(); });
+
+        get(api('/epwatch/movie_probe?' + ctx.showQs + '&balancer=' + encodeURIComponent(balancer)), function (r) {
+            Lampa.Loading.stop();
+            if (!r || !r.success) {
+                Lampa.Noty.show(L('epwatch_err_unknown') + ': ' + ((r && r.msg) || ''));
+                return ctx.back();
+            }
+
+            if (r.candidates && r.candidates.length) {
+                return pickCandidate(ctx, r.balancer_name || balancerName, r.candidates, function (lnk) {
+                    doMovieSub(ctx.card, balancer, ctx.$btn, ctx.onChanged, lnk);
+                }, { title: L('epwatch_movie_wait_exact'), subtitle: L('epwatch_movie_wait_exact_sub') });
+            }
+
+            doMovieSub(ctx.card, balancer, ctx.$btn, ctx.onChanged, r.link || '');
+        }, function () {
+            Lampa.Loading.stop();
+            Lampa.Noty.show(L('epwatch_err_network'));
+        }, 60000);
+    }
+
+    function doMovieSub(card, balancer, $btn, onChanged, link) {
         var payload = {
             tmdb_id:     card.id,
             title:       card.title || card.name || '',
             media_type:  'movie',
             balancer:    balancer || '',
+            link:        link || '',
             poster_path: card.poster_path || ''
         };
         Lampa.Loading.start(function () { Lampa.Loading.stop(); });
@@ -1013,6 +1153,9 @@
             '.epwatch-link__scan{font-size:0.95em;opacity:0.85;max-width:30em;margin:0.8em auto 0.2em;line-height:1.4}' +
             '.epwatch-link__code{display:inline-block;margin:0.5em auto 0;padding:0.45em 0.9em;background:rgba(255,255,255,0.12);border-radius:0.4em;font-size:1.05em;font-weight:600;word-break:break-all;max-width:30em;line-height:1.5}' +
             '.card__subscribe{font-size:0.85em}' +
+            '.selectbox-item__icon > .epw-poster{width:3em;height:4.5em;object-fit:cover;border-radius:0.3em;background:rgba(255,255,255,0.08)}' +
+            '.epw-cand > div:last-child{min-width:0;flex:1 1 auto}' +
+            '.epw-cand .selectbox-item__title{white-space:normal;word-break:break-word}' +
             '.card__subscribe-position.epw-new{color:#82d873}' +
             '.card__subscribe-position.epw-seen{color:#fff}' +
             '.card__subscribe-tmdb{display:block;font-size:0.72em;opacity:0.55;margin-top:0.15em;line-height:1.1;letter-spacing:0.02em}' +
@@ -1159,7 +1302,7 @@
 
         Lampa.SettingsApi.addParam({
             component: 'epwatch',
-            param: { name: 'epwatch_notify', type: 'trigger', 'default': true },
+            param: { name: 'epwatch_notify', type: 'trigger', 'default': false },
             field: {
                 name:        L('epwatch_notify'),
                 description: L('epwatch_notify_desc')

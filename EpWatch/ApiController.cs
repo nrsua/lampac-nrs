@@ -82,12 +82,21 @@ public class ApiController : BaseController
         if (user == null)
             return Json(new { success = true, linked = false, subscribed = false, voices = new string[0] });
 
-        var voices = await db.subs.AsNoTracking()
+        var rows = await db.subs.AsNoTracking()
             .Where(s => s.chat_id == user.chat_id && s.tmdb_id == tmdb_id)
-            .Select(s => s.voice ?? "")
-            .ToArrayAsync();
+            .Select(s => new { s.Id, s.voice, s.balancer })
+            .ToListAsync();
 
-        return Json(new { success = true, linked = true, subscribed = voices.Length > 0, voices });
+        var voices = rows.Select(r => r.voice ?? "").ToArray();
+        var items = rows.Select(r => new
+        {
+            id = r.Id,
+            voice = (r.voice ?? "").Trim(),
+            balancer = r.balancer ?? "",
+            balancer_name = BalancerProbe.DisplayName(r.balancer ?? "") ?? ""
+        }).ToArray();
+
+        return Json(new { success = true, linked = true, subscribed = voices.Length > 0, voices, items });
     }
     #endregion
 
@@ -177,7 +186,7 @@ public class ApiController : BaseController
     #region /epwatch/voices
     [HttpGet]
     [Route("epwatch/voices")]
-    public async Task<ActionResult> Voices(int tmdb_id, string title, int year = 0, int season = 0)
+    public async Task<ActionResult> Voices(int tmdb_id, string title, int year = 0, int season = 0, string balancer = null, string link = null)
     {
         RememberLocalHost();
 
@@ -207,6 +216,9 @@ public class ApiController : BaseController
         if (balancers.Count > 0)
             Log.Dbg($"[EpWatch] /voices balancers: {string.Join(", ", balancers.Select(b => b.balanser + "@" + b.name))}");
 
+        if (!string.IsNullOrWhiteSpace(balancer))
+            return await VoicesForBalancer(balancers, balancer.Trim(), link, sp, probeSeason, activeSeason, auth);
+
         var probeTasks = balancers
             .Select(b => BalancerProbe.ProbeAsync(b, sp, probeSeason, null, auth, HttpContext.RequestAborted))
             .ToArray();
@@ -220,7 +232,7 @@ public class ApiController : BaseController
         }
 
         var dedup = voices
-            .GroupBy(v => ((dynamic)v).name as string, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(v => (((dynamic)v).name as string) + "\t" + (((dynamic)v).balancer as string), StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First())
             .ToList();
 
@@ -234,17 +246,94 @@ public class ApiController : BaseController
             voices = dedup
         });
     }
+
+    async Task<ActionResult> VoicesForBalancer(List<BalancerEntry> balancers, string balancer, string link,
+        Models.ShowParams sp, int probeSeason, int activeSeason, AuthQs auth)
+    {
+        var ct = HttpContext.RequestAborted;
+        var entry = balancers.FirstOrDefault(b => string.Equals(b.balanser, balancer, StringComparison.OrdinalIgnoreCase));
+        if (entry == null)
+        {
+            return Json(new
+            {
+                success = true, season = activeSeason, balancer, balancer_name = BalancerProbe.DisplayName(balancer),
+                link = "", seasons = new int[0], candidates = new object[0], voices = new object[0], msg = "balancer_unavailable"
+            });
+        }
+
+        List<int> balSeasons;
+        if (string.IsNullOrWhiteSpace(link))
+        {
+            var search = await BalancerProbe.SearchAsync(entry, sp, auth, ct);
+            if (search.candidates.Count > 0)
+            {
+                return Json(new
+                {
+                    success = true, season = activeSeason, balancer = entry.balanser, balancer_name = entry.name,
+                    link = "", seasons = new int[0], candidates = search.candidates, voices = new object[0]
+                });
+            }
+            balSeasons = search.seasons;
+        }
+        else
+        {
+            var clean = BalancerProbe.SanitizeLink(link, entry.url);
+            if (clean.Length == 0)
+                return Json(new { success = false, msg = "bad_link" });
+
+            entry = new BalancerEntry { name = entry.name, balanser = entry.balanser, url = entry.url, link = clean };
+            balSeasons = await BalancerProbe.DiscoverSeasonsAsync(entry, sp, auth, ct);
+        }
+
+        var probed = await BalancerProbe.ProbeAsync(entry, sp, probeSeason, null, auth, ct);
+        var voices = probed.voices
+            .Select(v => new { name = v.name, t = v.t, balancer = entry.balanser })
+            .ToList();
+
+        Log.Dbg($"[EpWatch] /voices tmdb={sp.tmdb_id} balancer={entry.balanser} pinned={(entry.link.Length > 0 ? "yes" : "no")} -> seasons:[{string.Join(",", balSeasons)}] voices:{voices.Count}");
+
+        return Json(new
+        {
+            success = true, season = activeSeason, balancer = entry.balanser, balancer_name = entry.name,
+            link = entry.link ?? "", seasons = balSeasons, candidates = new object[0], voices
+        });
+    }
     #endregion
 
     #region /epwatch/balancers
     [HttpGet]
     [Route("epwatch/balancers")]
-    public async Task<ActionResult> Balancers(int tmdb_id, string title, int year = 0)
+    public async Task<ActionResult> Balancers(int tmdb_id, string title, int year = 0, int serial = 0)
     {
         RememberLocalHost();
 
         var lang = await UserLang();
         var auth = RequestAuth();
+
+        if (serial == 1)
+        {
+            var show = await TmdbClient.GetShowAsync(tmdb_id, lang, HttpContext.RequestAborted);
+            var ssp = new Models.ShowParams
+            {
+                tmdb_id = tmdb_id,
+                title = !string.IsNullOrWhiteSpace(show?.name) ? show.name : (title ?? ""),
+                original_title = show?.original_name ?? "",
+                original_language = show?.original_language ?? "",
+                imdb_id = show?.imdb_id ?? "",
+                year = year > 0 ? year : (show?.first_air_year ?? 0)
+            };
+
+            var tvBalancers = await BalancerProbe.GetAvailableAsync(ssp, auth, HttpContext.RequestAborted);
+            Log.Dbg($"[EpWatch] /balancers serial tmdb={tmdb_id} -> {tvBalancers.Count}");
+
+            return Json(new
+            {
+                success = true,
+                season = show?.latest_aired_season ?? 1,
+                balancers = tvBalancers.Select(b => new { name = b.name, balancer = b.balanser }).ToArray()
+            });
+        }
+
         var movie = await TmdbClient.GetMovieAsync(tmdb_id, lang, HttpContext.RequestAborted);
 
         var sp = new Models.ShowParams
@@ -268,6 +357,59 @@ public class ApiController : BaseController
     }
     #endregion
 
+    #region /epwatch/movie_probe
+    [HttpGet]
+    [Route("epwatch/movie_probe")]
+    public async Task<ActionResult> MovieProbe(int tmdb_id, string title, string balancer, int year = 0, string link = null)
+    {
+        RememberLocalHost();
+        if (tmdb_id <= 0 || string.IsNullOrWhiteSpace(balancer))
+            return Json(new { success = false, msg = "bad_args" });
+
+        var ct = HttpContext.RequestAborted;
+        var lang = await UserLang();
+        var auth = RequestAuth();
+        var movie = await TmdbClient.GetMovieAsync(tmdb_id, lang, ct);
+
+        var sp = new Models.ShowParams
+        {
+            tmdb_id = tmdb_id,
+            title = !string.IsNullOrWhiteSpace(movie?.name) ? movie.name : (title ?? ""),
+            original_title = movie?.original_name ?? "",
+            original_language = movie?.original_language ?? "",
+            imdb_id = movie?.imdb_id ?? "",
+            year = year > 0 ? year : (movie?.first_air_year ?? 0)
+        };
+
+        var balancers = await BalancerProbe.GetAvailableAsync(sp, auth, ct, movie: true);
+        var entry = balancers.FirstOrDefault(b => string.Equals(b.balanser, balancer.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (entry == null)
+            return Json(new { success = true, balancer, link = "", candidates = new object[0], available = false, voices = new string[0], msg = "balancer_unavailable" });
+
+        if (string.IsNullOrWhiteSpace(link))
+        {
+            var search = await BalancerProbe.SearchAsync(entry, sp, auth, ct, movie: true);
+            if (search.candidates.Count > 0)
+                return Json(new { success = true, balancer = entry.balanser, balancer_name = entry.name, link = "", candidates = search.candidates, available = false, voices = new string[0] });
+        }
+        else
+        {
+            var clean = BalancerProbe.SanitizeLink(link, entry.url);
+            if (clean.Length == 0) return Json(new { success = false, msg = "bad_link" });
+            entry = new BalancerEntry { name = entry.name, balanser = entry.balanser, url = entry.url, link = clean };
+        }
+
+        var probed = await BalancerProbe.ProbeMovieAsync(entry, sp, auth, ct);
+        Log.Dbg($"[EpWatch] /movie_probe tmdb={tmdb_id} balancer={entry.balanser} pinned={(entry.link.Length > 0 ? "yes" : "no")} -> available={probed.available} voices={probed.voices.Count}");
+
+        return Json(new
+        {
+            success = true, balancer = entry.balanser, balancer_name = entry.name, link = entry.link ?? "",
+            candidates = new object[0], available = probed.available, voices = probed.voices
+        });
+    }
+    #endregion
+
     public class SubscribeBody
     {
         public int tmdb_id { get; set; }
@@ -280,6 +422,7 @@ public class ApiController : BaseController
         public int voice_episode { get; set; }
         public int target_season { get; set; }
         public string media_type { get; set; }
+        public string link { get; set; }
     }
 
     #region /epwatch/subscribe
@@ -316,12 +459,35 @@ public class ApiController : BaseController
         var user = await db.users.FirstOrDefaultAsync(u => u.lampac_uid == uid);
         if (user == null) return Json(new { success = false, msg = "not_linked" });
 
-        if (string.Equals(data.media_type, "movie", StringComparison.OrdinalIgnoreCase))
-            return await SubscribeMovie(db, user, data);
+        var gate = _subscribeGates.GetOrAdd(user.chat_id, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync(HttpContext.RequestAborted);
+        try
+        {
+            if (string.Equals(data.media_type, "movie", StringComparison.OrdinalIgnoreCase))
+                return await SubscribeMovie(db, user, data);
 
-        var v = data.voice ?? "";
-        var existing = await db.subs.FirstOrDefaultAsync(s =>
-            s.chat_id == user.chat_id && s.tmdb_id == data.tmdb_id && s.voice == v);
+            return await SubscribeTv(db, user, data);
+        }
+        finally { gate.Release(); }
+    }
+
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<long, SemaphoreSlim> _subscribeGates = new();
+
+    async Task<ActionResult> SubscribeTv(SqlContext db, TgUserRow user, SubscribeBody data)
+    {
+        var v = (data.voice ?? "").Trim();
+        var bal = (data.balancer ?? "").Trim();
+        var link = v.Length > 0 && bal.Length > 0 ? BalancerProbe.SanitizeLink(data.link, null) : "";
+
+        var sameShow = await db.subs
+            .Where(s => s.chat_id == user.chat_id && s.tmdb_id == data.tmdb_id)
+            .ToListAsync();
+        sameShow = sameShow.Where(s => !string.Equals(s.media_type, "movie", StringComparison.OrdinalIgnoreCase)).ToList();
+
+        var existing = sameShow.FirstOrDefault(s =>
+                           string.Equals((s.voice ?? "").Trim(), v, StringComparison.OrdinalIgnoreCase)
+                           && string.Equals((s.balancer ?? "").Trim(), bal, StringComparison.OrdinalIgnoreCase))
+                       ?? (v.Length == 0 ? sameShow.FirstOrDefault(s => string.IsNullOrWhiteSpace(s.voice)) : null);
 
         var L = Strings.Normalize(user.lang);
         var show = await TmdbClient.GetShowAsync(data.tmdb_id, L, HttpContext.RequestAborted);
@@ -358,10 +524,16 @@ public class ApiController : BaseController
                 try
                 {
                     balancers = await BalancerProbe.GetAvailableAsync(sp, auth, HttpContext.RequestAborted);
+                    var pinnedEntry = balancers.FirstOrDefault(x => bal.Length > 0
+                                              && string.Equals(x.balanser, bal, StringComparison.OrdinalIgnoreCase));
+                    if (pinnedEntry != null && link.Length > 0)
+                        link = BalancerProbe.SanitizeLink(link, pinnedEntry.url);
+                    balancers = BalancerProbe.WithLink(balancers, bal, link);
+
                     tvdb = await TvdbClient.GetByImdbAsync(show.imdb_id, data.tmdb_id, HttpContext.RequestAborted);
                     tvdbId = tvdb?.tvdb_id ?? 0;
-                    var refBalancer = balancers.FirstOrDefault(x => !string.IsNullOrEmpty(data.balancer)
-                                              && string.Equals(x.balanser, data.balancer, StringComparison.OrdinalIgnoreCase))
+                    var refBalancer = balancers.FirstOrDefault(x => bal.Length > 0
+                                              && string.Equals(x.balanser, bal, StringComparison.OrdinalIgnoreCase))
                                       ?? balancers.FirstOrDefault();
                     structureSource = await StructureResolver.ResolveAsync(show, tvdb, refBalancer, sp, auth, HttpContext.RequestAborted);
                 }
@@ -386,8 +558,7 @@ public class ApiController : BaseController
                 {
                     foreach (var b in balancers)
                     {
-                        if (!string.IsNullOrEmpty(data.balancer)
-                            && !string.Equals(b.balanser, data.balancer, StringComparison.OrdinalIgnoreCase))
+                        if (bal.Length > 0 && !string.Equals(b.balanser, bal, StringComparison.OrdinalIgnoreCase))
                             continue;
 
                         var probed = await BalancerProbe.ProbeAsync(b, sp, effectiveSeason, v, auth, HttpContext.RequestAborted);
@@ -412,7 +583,8 @@ public class ApiController : BaseController
                 tmdb_id = data.tmdb_id,
                 title = data.title,
                 voice = v,
-                balancer = data.balancer ?? "",
+                balancer = bal,
+                balancer_link = link,
                 last_season = effectiveSeason,
                 last_episode = initialLastEpisode,
                 last_voice_episode = initialLastVoiceEpisode,
@@ -433,7 +605,9 @@ public class ApiController : BaseController
         else
         {
             existing.title = data.title;
-            existing.balancer = data.balancer ?? existing.balancer;
+            existing.voice = v;
+            existing.balancer = bal;
+            existing.balancer_link = link;
             existing.poster_path = data.poster_path ?? existing.poster_path;
             existing.target_season = data.target_season;
             existing.tvdb_id = tvdbId;
@@ -460,7 +634,7 @@ public class ApiController : BaseController
             return Json(new { success = false, msg = "db_error", detail = ex.Message });
         }
 
-        Log.Info($"[EpWatch] /subscribe OK chat_id={user.chat_id} tmdb_id={data.tmdb_id} voice=\"{v}\" balancer=\"{data.balancer}\"");
+        Log.Info($"[EpWatch] /subscribe OK chat_id={user.chat_id} tmdb_id={data.tmdb_id} voice=\"{v}\" balancer=\"{bal}\" pinned={(link.Length > 0 ? "yes" : "no")}");
 
         if (Notifier.Ready)
         {
@@ -495,6 +669,8 @@ public class ApiController : BaseController
         var L = Strings.Normalize(user.lang);
         var movie = await TmdbClient.GetMovieAsync(data.tmdb_id, L, HttpContext.RequestAborted);
         var title = !string.IsNullOrWhiteSpace(movie?.name) ? movie.name : data.title;
+        var bal = (data.balancer ?? "").Trim();
+        var link = bal.Length > 0 ? BalancerProbe.SanitizeLink(data.link, null) : "";
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
@@ -511,8 +687,13 @@ public class ApiController : BaseController
             };
 
             var balancers = await BalancerProbe.GetAvailableAsync(sp, auth, HttpContext.RequestAborted, movie: true);
-            if (!string.IsNullOrEmpty(data.balancer))
-                balancers = balancers.Where(b => string.Equals(b.balanser, data.balancer, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (bal.Length > 0)
+            {
+                balancers = balancers.Where(b => string.Equals(b.balanser, bal, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (balancers.Count > 0 && link.Length > 0)
+                    link = BalancerProbe.SanitizeLink(link, balancers[0].url);
+                balancers = BalancerProbe.WithLink(balancers, bal, link);
+            }
 
             var probeTasks = balancers
                 .Select(b => BalancerProbe.ProbeMovieAsync(b, sp, auth, HttpContext.RequestAborted))
@@ -522,7 +703,7 @@ public class ApiController : BaseController
             {
                 if (!probedAll[i].available) continue;
                 var vlist = probedAll[i].voices.Count > 0 ? probedAll[i].voices : new System.Collections.Generic.List<string> { "" };
-                foreach (var v in vlist) seen.Add(balancers[i].balanser + "\t" + v);
+                foreach (var v in vlist) seen.Add(EpisodeChecker.MovieKey(balancers[i].balanser, v));
             }
             Log.Dbg($"[EpWatch] /subscribe movie baseline: {seen.Count} voices already present");
         }
@@ -545,7 +726,8 @@ public class ApiController : BaseController
                 title = title,
                 media_type = "movie",
                 voice = "",
-                balancer = data.balancer ?? "",
+                balancer = bal,
+                balancer_link = link,
                 seen_voices = seedCsv,
                 poster_path = data.poster_path ?? movie?.poster_path ?? "",
                 subscribed_at = DateTime.UtcNow,
@@ -556,7 +738,8 @@ public class ApiController : BaseController
         else
         {
             existing.title = title;
-            existing.balancer = data.balancer ?? existing.balancer;
+            existing.balancer = bal;
+            existing.balancer_link = link;
             existing.seen_voices = seedCsv;
             existing.poster_path = data.poster_path ?? existing.poster_path;
             existing.next_check_at = DateTime.UtcNow.AddMinutes(Math.Max(5, ModInit.conf.check_interval_minutes));
@@ -572,11 +755,11 @@ public class ApiController : BaseController
 
         if (Notifier.Ready)
         {
-            var balName = string.IsNullOrEmpty(data.balancer) ? Strings.T(L, "movie_any_balancer") : BalancerProbe.DisplayName(data.balancer);
+            var balName = bal.Length == 0 ? Strings.T(L, "movie_any_balancer") : BalancerProbe.DisplayName(bal);
             _ = Notifier.SendTextAsync(user.chat_id, Strings.T(L, "movie_sub_added", Notifier.Esc(title), Notifier.Esc(balName)), HttpContext.RequestAborted);
         }
 
-        Log.Info($"[EpWatch] /subscribe MOVIE chat_id={user.chat_id} tmdb_id={data.tmdb_id} balancer=\"{data.balancer}\"");
+        Log.Info($"[EpWatch] /subscribe MOVIE chat_id={user.chat_id} tmdb_id={data.tmdb_id} balancer=\"{bal}\" pinned={(link.Length > 0 ? "yes" : "no")}");
         return Json(new { success = true });
     }
     #endregion
@@ -585,6 +768,7 @@ public class ApiController : BaseController
     {
         public int tmdb_id { get; set; }
         public string voice { get; set; }
+        public long id { get; set; }
     }
 
     #region /epwatch/unsubscribe
@@ -610,13 +794,14 @@ public class ApiController : BaseController
         if (user == null) return Json(new { success = false, msg = "not_linked" });
 
         IQueryable<SubscriptionRow> q = db.subs.Where(s => s.chat_id == user.chat_id && s.tmdb_id == data.tmdb_id);
-        if (data.voice != null) q = q.Where(s => s.voice == data.voice);
+        if (data.id > 0) q = q.Where(s => s.Id == data.id);
+        else if (data.voice != null) q = q.Where(s => s.voice == data.voice);
 
         var rows = await q.ToListAsync();
         if (rows.Count == 0)
             return Json(new { success = true, removed = 0 });
 
-        var snapshot = rows.Select(r => new { r.title, r.voice }).ToList();
+        var snapshot = rows.Select(r => new { r.title, voice = Notifier.VoiceText(r.voice) }).ToList();
         db.subs.RemoveRange(rows);
         await db.SaveChangesAsync();
 
@@ -725,7 +910,7 @@ public class ApiController : BaseController
             if (season <= 0) continue;
 
             var eps = await TmdbClient.GetSeasonAsync(show.id, season, lang, ct);
-            var voice = grp.Select(g => g.voice).FirstOrDefault(v => !string.IsNullOrEmpty(v)) ?? "";
+            var voice = grp.Select(g => Notifier.VoiceText(g.voice)).FirstOrDefault(v => v.Length > 0) ?? "";
             var balancer = grp.Select(g => g.balancer).FirstOrDefault(b => !string.IsNullOrEmpty(b)) ?? "";
 
             int added = 0;

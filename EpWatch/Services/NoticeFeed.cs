@@ -35,7 +35,7 @@ public static class NoticeFeed
                     episode = ep.episode,
                     ep_name = ep.name ?? "",
                     still_url = ep.still_url ?? "",
-                    voice = sub.voice ?? "",
+                    voice = Notifier.VoiceText(sub.voice),
                     balancer = sub.balancer ?? "",
                     extra = "",
                     created_at = now
@@ -60,7 +60,7 @@ public static class NoticeFeed
             using var db = SqlContext.Create();
 
             var extra = string.Join("\n", items.Select(i =>
-                BalancerProbe.DisplayName(i.balancer ?? "") + "\t" + (i.voice ?? "")));
+                BalancerProbe.DisplayName(i.balancer ?? "") + "\t" + Notifier.VoiceText(i.voice)));
 
             db.notices.Add(new NoticeRow
             {
@@ -72,7 +72,7 @@ public static class NoticeFeed
                 poster_path = sub.poster_path ?? "",
                 ep_name = "",
                 still_url = "",
-                voice = items.Select(i => i.voice).FirstOrDefault(v => !string.IsNullOrEmpty(v)) ?? "",
+                voice = items.Select(i => Notifier.VoiceText(i.voice)).FirstOrDefault(v => v.Length > 0) ?? "",
                 balancer = items[0].balancer ?? "",
                 extra = extra,
                 created_at = DateTime.UtcNow

@@ -66,7 +66,17 @@ public sealed class TelegramApi
         if (offset.HasValue) body["offset"] = offset.Value;
 
         var r = await CallAsync("getUpdates", body, ct, timeout: TimeSpan.FromSeconds(timeoutSeconds + 10));
-        return r?["result"] as JArray;
+        if (r == null) throw new InvalidOperationException("empty response");
+
+        if (r.Value<bool?>("ok") == false)
+        {
+            var code = r.Value<int?>("error_code") ?? 0;
+            if (code == 409)
+                throw new InvalidOperationException("409 Conflict: this bot_token is polled by another instance (second lampac with EpWatch or a webhook). Stop the other one or give it a separate bot");
+            throw new InvalidOperationException($"{code} {r.Value<string>("description")}");
+        }
+
+        return r["result"] as JArray ?? new JArray();
     }
 
     public Task SendMessageAsync(long chatId, string text, object replyMarkup, string parseMode, CancellationToken ct)

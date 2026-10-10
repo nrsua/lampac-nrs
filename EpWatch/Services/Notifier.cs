@@ -32,7 +32,7 @@ public static class Notifier
 
         if (!string.IsNullOrEmpty(sub.voice))
         {
-            sb.Append("🎙 ").Append(Esc(sub.voice)).Append('\n');
+            sb.Append("🎙 ").Append(Esc(VoiceText(sub.voice))).Append('\n');
             if (!string.IsNullOrEmpty(sub.balancer))
                 sb.Append("🌐 ").Append(Esc(BalancerProbe.DisplayName(sub.balancer))).Append('\n');
         }
@@ -79,7 +79,7 @@ public static class Notifier
 
         if (!string.IsNullOrEmpty(sub.voice))
         {
-            sb.Append("🎙 ").Append(Esc(sub.voice)).Append('\n');
+            sb.Append("🎙 ").Append(Esc(VoiceText(sub.voice))).Append('\n');
             if (!string.IsNullOrEmpty(sub.balancer))
                 sb.Append("🌐 ").Append(Esc(BalancerProbe.DisplayName(sub.balancer))).Append('\n');
         }
@@ -122,7 +122,7 @@ public static class Notifier
         foreach (var g in items.GroupBy(i => i.balancer))
         {
             sb.Append("\n🌐 ").Append(Esc(BalancerProbe.DisplayName(g.Key)));
-            foreach (var voice in g.Select(x => x.voice).Where(v => !string.IsNullOrEmpty(v)).Distinct())
+            foreach (var voice in g.Select(x => VoiceText(x.voice)).Where(v => v.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase))
                 sb.Append("\n   🎙 ").Append(Esc(voice));
         }
 
@@ -169,6 +169,8 @@ public static class Notifier
     }
 
     public static string FormatSE(int s, int e) => $"S{s:D2}E{e:D2}";
+
+    public static string VoiceText(string voice) => (voice ?? "").Trim();
 
     public static string IdTag(string mediaType, int tmdbId)
     {

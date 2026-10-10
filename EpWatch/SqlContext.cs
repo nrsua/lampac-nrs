@@ -73,7 +73,8 @@ public class SqlContext : DbContext
             ["tvdb_id"]       = "INTEGER NOT NULL DEFAULT 0",
             ["structure_source"] = "TEXT NOT NULL DEFAULT ''",
             ["media_type"]    = "TEXT NOT NULL DEFAULT 'tv'",
-            ["seen_voices"]   = "TEXT NOT NULL DEFAULT ''"
+            ["seen_voices"]   = "TEXT NOT NULL DEFAULT ''",
+            ["balancer_link"] = "TEXT NOT NULL DEFAULT ''"
         };
         var userAdds = new Dictionary<string, string>
         {
@@ -169,6 +170,8 @@ public class SubscriptionRow
     public string voice { get; set; } = "";
 
     public string balancer { get; set; } = "";
+
+    public string balancer_link { get; set; } = "";
 
     public int last_season { get; set; }
     public int last_episode { get; set; }
